@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+    <extension
+        point="org.eclipse.ui.views">
+
+        <category
+            id="com.example.cpputest.category"
+            name="CppUTest">
+        </category>
+
+        <view
+            id="com.example.cpputest.view.TestResultView"
+            name="CppUTest Results"
+            class="com.example.cpputest.view.TestResultView"
+            category="com.example.cpputest.category"
+            icon="icons/sample.gif">
+        </view>
+    </extension>
+</plugin>
