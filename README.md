@@ -1,0 +1,2 @@
+# CppUTest_e2studio_plugin
+CppUTestをe2studioで使いやすくするプラグイン
