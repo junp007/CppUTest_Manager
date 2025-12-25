@@ -1,5 +1,8 @@
 package com.example.cpputest.view;
 
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.CheckboxTableViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
@@ -24,32 +27,34 @@ public class TestResultView extends ViewPart {
 
     // テストケースのデータを保持する簡単な内部クラス
     public static class TestCase {
-    	String groupName;
+        String groupName;
         String testName;
         boolean success;
+
         public TestCase(String groupName, String testName, boolean success) {
-        	this.groupName = groupName;
-        	this.testName = testName;
-        	this.success = success;
+            this.groupName = groupName;
+            this.testName = testName;
+            this.success = success;
         }
+
         public TestCase(String groupName, String testName) {
-        	this(groupName, testName, false);
+            this(groupName, testName, false);
         }
-        
+
         public String getGroupName() {
-        	return this.groupName;
+            return this.groupName;
         }
-        
+
         public String getTestName() {
-        	return this.testName;
+            return this.testName;
         }
-        
+
         public String getFullName() {
-        	return this.groupName + "." + this.testName;
+            return this.groupName + "." + this.testName;
         }
-        
+
         boolean IsSameCase(final String groupName, final String testName) {
-        	return this.groupName.equals(groupName) && this.testName.equals(testName);
+            return this.groupName.equals(groupName) && this.testName.equals(testName);
         }
     }
 
@@ -69,7 +74,7 @@ public class TestResultView extends ViewPart {
             public String getText(Object element) {
                 return ((TestCase) element).getFullName();
             }
-            
+
             @Override
             public Color getForeground(Object element) {
                 // 成功なら緑、失敗なら赤（今は仮のロジック）
@@ -82,31 +87,31 @@ public class TestResultView extends ViewPart {
         });
 
         viewer.setContentProvider(ArrayContentProvider.getInstance());
-        
+
         createToolbar();
     }
-    
+
     private void createToolbar() {
+        
+        String projectName = "YHT_UnitTest";
+        
         // 実行ボタンのアクションを定義
-        org.eclipse.jface.action.Action runAction = new org.eclipse.jface.action.Action("Run Tests") {
+        org.eclipse.jface.action.Action runAction = new org.eclipse.jface.action.Action("Run") {
             @Override
             public void run() {
-                // チェックされている項目を取得
+                // 1. チェックされている項目を取得
                 Object[] checkedElements = viewer.getCheckedElements();
-                
+
                 System.out.println("Selected tests count: " + checkedElements.length);
                 for (Object obj : checkedElements) {
                     TestCase tc = (TestCase) obj;
                     System.out.println("Will run: " + tc.getFullName());
                 }
                 
-                // 1. mainファイルを生成
-                TestRunnerGenerator.generateMain("YHT_UnitTest", checkedElements);
-                
-                // 2. 将来的にはここに「ビルド開始」と「デバッグ開始」のコードを追加します
-                System.out.println("Main file generated. Ready to build and run.");
-                
-//                VirtualConsoleMirror.scanAndHook();
+
+                // 2. mainファイルを生成
+                TestRunnerGenerator.generateMain(projectName, checkedElements);
+
             }
         };
 
@@ -114,13 +119,13 @@ public class TestResultView extends ViewPart {
 //        runAction.setImageDescriptor(org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().
 //        		getImageDescriptor(org.eclipse.ui.ISharedImages.IMG_ETOOL_SAVEAS_EDIT));
 
-        org.eclipse.jface.action.Action scanAction = new org.eclipse.jface.action.Action("Scan Tests") {
+        org.eclipse.jface.action.Action scanAction = new org.eclipse.jface.action.Action("Scan") {
             @Override
             public void run() {
-            	TestScanner.scanProject("YHT_UnitTest");
+                TestScanner.scanProject(projectName);
             }
         };
-        
+
         runAction.setToolTipText("Run selected CppUTest cases");
         scanAction.setToolTipText("Scan CppUTest cases");
         // ビューのツールバーにボタンを追加
@@ -128,7 +133,7 @@ public class TestResultView extends ViewPart {
         bars.getToolBarManager().add(runAction);
         bars.getToolBarManager().add(scanAction);
     }
-    
+
     @Override
     public void setFocus() {
         viewer.getControl().setFocus();
@@ -136,13 +141,13 @@ public class TestResultView extends ViewPart {
 
     private static TestResultView instance;
     private List<TestCase> testCases = new ArrayList<>();
-    
+
     public TestResultView() {
         instance = this;
     }
 
     private TestCase updateTestCase(final String groupName, final String testName) {
-    	TestCase target = null;
+        TestCase target = null;
 
         for (TestCase tc : testCases) {
             if (tc.IsSameCase(groupName, testName)) {
@@ -150,32 +155,34 @@ public class TestResultView extends ViewPart {
                 break;
             }
         }
-        
+
         if (target == null) {
-        	// 新しいものだったら追加する
-        	target = new TestCase(groupName, testName);
-        	testCases.add(target);
-        	viewer.setInput(testCases);
-        	viewer.setChecked(target, true);
+            // 新しいものだったら追加する
+            target = new TestCase(groupName, testName);
+            testCases.add(target);
+            viewer.setInput(testCases);
+            viewer.setChecked(target, true);
         }
-        
+
         return target;
     }
-    
+
     public static void appendTestCase(final String groupName, final String testName) {
-        if (instance == null) return;
-        
+        if (instance == null)
+            return;
+
         Display.getDefault().asyncExec(() -> {
-        	TestCase target = instance.updateTestCase(groupName, testName);
+            TestCase target = instance.updateTestCase(groupName, testName);
             instance.viewer.refresh(target);
         });
     }
-    
+
     public static void updateTestResult(final String groupName, final String testName, final boolean isSuccess) {
-        if (instance == null) return;
-        
+        if (instance == null)
+            return;
+
         Display.getDefault().asyncExec(() -> {
-        	TestCase target = instance.updateTestCase(groupName, testName);
+            TestCase target = instance.updateTestCase(groupName, testName);
             target.success = isSuccess;
             instance.viewer.refresh(target);
         });
