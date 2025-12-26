@@ -13,6 +13,10 @@ import org.eclipse.core.resources.IResourceProxyVisitor;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import com.example.cpputest.view.TestResultView;
+import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
 
 public class TestScanner {
 
@@ -21,25 +25,48 @@ public class TestScanner {
         Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
 
     public static void scanProject(String projectName) {
-        IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
-        if (!project.exists() || !project.isOpen()) return;
-
-        try {
-            project.accept(new IResourceProxyVisitor() {
-                @Override
-                public boolean visit(IResourceProxy proxy) throws CoreException {
-                    if (proxy.getType() == IResource.FILE) {
-                        String name = proxy.getName();
-                        if (name.endsWith(".cpp")) {
-                            parseFile((IFile) proxy.requestResource());
-                        }
-                    }
-                    return true; // 子リソースも探索
+     // Jobの作成
+        Job job = new Job("Scanning CppUTest cases in " + projectName) {
+            @Override
+            protected IStatus run(IProgressMonitor monitor) {
+                IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
+                if (!project.exists() || !project.isOpen()) {
+                    return Status.OK_STATUS;
                 }
-            }, IResource.NONE);
-        } catch (CoreException e) {
-            e.printStackTrace();
-        }
+        
+                try {
+                 // 全体的なファイル数を把握するのは難しいため、不確定な進捗として開始
+                    monitor.beginTask("Reading files...", IProgressMonitor.UNKNOWN);
+
+                    project.accept(new IResourceProxyVisitor() {
+                        @Override
+                        public boolean visit(IResourceProxy proxy) throws CoreException {
+                         // キャンセルボタンが押されたかチェック
+                            if (monitor.isCanceled()) return false;
+                            
+                            if (proxy.getType() == IResource.FILE) {
+                                String name = proxy.getName();
+                                if (name.endsWith(".cpp")) {
+                                    monitor.subTask("Analyzing: " + name);
+                                    parseFile((IFile) proxy.requestResource());
+                                }
+                            }
+                            return true; // 子リソースも探索
+                        }
+                    }, IResource.NONE);
+                } catch (CoreException e) {
+                    return new Status(IStatus.ERROR, "com.example.cpputest", "Scan failed", e);
+                } finally {
+                    monitor.done();
+                }
+
+                return Status.OK_STATUS;
+            }
+        };
+        
+        // Jobの優先度設定（ユーザー操作に対する反応なので、少し高めに設定）
+        job.setUser(true); 
+        job.schedule(); // 実行キューに入れる
     }
 
     private static void parseFile(IFile file) {
@@ -51,7 +78,7 @@ public class TestScanner {
                     String group = matcher.group(1);
                     String name = matcher.group(2);
                     // ビューに未完了状態で追加
-                    TestResultView.updateTestResult(group, name, false);
+                    TestResultView.updateTestResult(group, name, false, false);
                 }
             }
         } catch (Exception e) {

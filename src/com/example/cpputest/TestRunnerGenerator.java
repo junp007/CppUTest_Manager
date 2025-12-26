@@ -1,6 +1,15 @@
 package com.example.cpputest;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
@@ -10,10 +19,14 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Path;
 
 import com.example.cpputest.view.TestResultView.TestCase;
+import com.example.cpputest.view.TestResultView.TestGroup;
 
 public class TestRunnerGenerator {
 
-    public static void generateMain(String projectName, Object[] selectedTests) {
+    public static void generateMain(String projectName, Object[] checkedElements, List<TestGroup> allGroups) {
+     // 高速判定のために配列を Set に変換（お作法）
+        Set<Object> checkedSet = new HashSet<>(Arrays.asList(checkedElements));
+        
         // 1. プロジェクトを取得
         IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
 
@@ -25,7 +38,7 @@ public class TestRunnerGenerator {
         try {
             // 2. src/cpputest_gen フォルダの取得と作成
             IFolder folder = project.getFolder(new Path("src/cpputest_gen"));
-//            prepareFolder(folder);
+
             if (!folder.exists()) {
                 folder.create(true, true, null);
             }
@@ -40,25 +53,32 @@ public class TestRunnerGenerator {
             // CppUTestは "-st GroupName.TestName" で実行するテストを絞り込む
             sb.append("    const char* args[] = {\"test\", \"-v\"");
 
-            if (selectedTests == null || selectedTests.length == 0) {
-                // 何も選択されていない場合、すべてを実行
-            } else {
-                // 選択されたテストがある場合、引数をシミュレートする
-                for (Object obj : selectedTests) {
-                    // TestResultView.TestCase クラスのインスタンスと想定
-                    // -st <group>.<testName> で実行するテストを指定する
-                    TestCase tc = (TestCase) obj;
-                    sb.append(", \"-st\", \"" + tc.getFullName() + "\"");
+            // 引数の生成処理
+            for (TestGroup gp : allGroups) {
+                // そのグループ内の「チェックされているテスト」を抽出
+                List<TestCase> selectedInGroup = gp.getCases().stream().filter(tc -> checkedSet.contains(tc)).collect(Collectors.toList());
+                if (selectedInGroup.isEmpty()) {
+                    continue; // このグループは何も選ばれていない
+                }
+
+                // 「グループ全選択」か「個別選択」かを判定
+                if (selectedInGroup.size() == gp.getCases().size()) {
+                    // 全件選択なら -g
+                    sb.append(", \"-g\", \"").append(gp.getName()).append("\"");
+                } else {
+                    // 一部なら -st
+                    for (TestCase tc : selectedInGroup) {
+                        sb.append(", \"-st\", \"").append(tc.getFullName()).append("\"");
+                    }
                 }
             }
 
             sb.append("};\n");
             sb.append("    return CommandLineTestRunner::RunAllTests(sizeof(args)/sizeof(char*), (char**)args);\n");
-
             sb.append("}\n\n");
             sb.append("#ifdef __cplusplus\n\nextern \"C\" {\nvoid abort(void)\n{\n}\n}\n#endif\n");
 
-            // 4. ファイルの保存
+            // ファイルの保存
             IFile file = folder.getFile("generated_main.cpp");
             ByteArrayInputStream stream = new ByteArrayInputStream(sb.toString().getBytes());
 

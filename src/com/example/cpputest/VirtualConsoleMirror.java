@@ -100,7 +100,7 @@ public class VirtualConsoleMirror {
 
                         // 失敗(Failure)という文字が含まれていれば false、そうでなければ true
                         boolean isSuccess = !line.contains("Failure");
-                        TestResultView.updateTestResult(group, name, isSuccess);
+                        TestResultView.updateTestResult(group, name, isSuccess, true);
                     }
                 } catch (Exception e) {
                     // パース失敗時は何もしない
