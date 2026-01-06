@@ -471,6 +471,10 @@ public class TestResultView extends ViewPart {
             // 選択変更時のイベント
             m_projectCombo.addSelectionChangedListener(event -> {
                 if (m_scanAction != null) {
+                    // 現在表示されているデータをクリアする
+                    m_testGroups.clear();
+                    m_viewer.refresh();
+                    // プロジェクトのテストケースをスキャンする
                     scanProjectTestCase();
                 }
             });
