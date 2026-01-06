@@ -3,33 +3,36 @@ package com.example.cpputest.view;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchManager;
+import org.eclipse.debug.ui.DebugUITools;
+import org.eclipse.jface.action.Action;
+import org.eclipse.jface.action.ActionContributionItem;
 import org.eclipse.jface.action.ControlContribution;
+import org.eclipse.jface.action.IMenuCreator;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.viewers.ArrayContentProvider;
-import org.eclipse.jface.viewers.CheckboxTableViewer;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ComboViewer;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.jface.viewers.StructuredSelection;
-import org.eclipse.jface.viewers.TableViewerColumn;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Menu;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.part.ViewPart;
 
 import com.example.cpputest.TestRunnerGenerator;
-import com.example.cpputest.VirtualConsoleMirror;
 import com.example.cpputest.parser.TestScanner;
 
 import java.util.ArrayList;
@@ -41,6 +44,7 @@ public class TestResultView extends ViewPart {
 //    public static final String ID = "com.example.cpputest.view.TestResultView";
     private ComboViewer m_projectCombo;
     private org.eclipse.jface.action.Action m_scanAction;
+    private org.eclipse.jface.action.Action m_runAction;
     private CheckboxTreeViewer m_viewer;
     private List<TestGroup> m_testGroups = new ArrayList<>();
     
@@ -234,10 +238,12 @@ public class TestResultView extends ViewPart {
         }
     }
 
+    private LaunchConfigurationMenuCreator menuCreator;
+    private String runActionTooltipBase = "Run selected CppUTest cases";
     // ツールバーを作成
     private void createToolbar() {
         // 実行ボタンのアクションを定義
-        org.eclipse.jface.action.Action runAction = new org.eclipse.jface.action.Action("Run") {
+        m_runAction = new org.eclipse.jface.action.Action("Run", Action.AS_DROP_DOWN_MENU) {
             @Override
             public void run() {
                 String projectName = getSelectedProjectName();
@@ -247,6 +253,14 @@ public class TestResultView extends ViewPart {
                 Object[] checkedElements = m_viewer.getCheckedElements();
                 // mainファイルを生成
                 TestRunnerGenerator.generateMain(projectName, checkedElements, m_testGroups);
+                
+                // 最後に選んだ構成があればそれを使う、なければ自動で探す
+                ILaunchConfiguration config = menuCreator.getLastSelectedConfig();
+                if (config == null) {
+                    // 最後に選んだ構成が無ければプロジェクト名で構成を探す
+                    config = findConfiguration(projectName);
+                }
+                launchTests(config, projectName);
             }
         };
 
@@ -264,7 +278,7 @@ public class TestResultView extends ViewPart {
             }
         };
 
-        runAction.setToolTipText("Run selected CppUTest cases");
+        m_runAction.setToolTipText(runActionTooltipBase);
         m_scanAction.setToolTipText("Scan CppUTest cases");
         
         // ビューのツールバーにボタンを追加
@@ -273,12 +287,17 @@ public class TestResultView extends ViewPart {
         
         // プロジェクト選択コンボボックスを最初に追加
         ProjectComboContribution comboContribution = new ProjectComboContribution("projectSelector");
+        
+        // ▼ メニューの紐付け
+        menuCreator = new LaunchConfigurationMenuCreator(this);
+        m_runAction.setMenuCreator(menuCreator);
+        
         toolbarManager.add(comboContribution);
         // セパレーター（区切り線）を入れる
         toolbarManager.add(new Separator());
         
-        toolbarManager.add(runAction);
         toolbarManager.add(m_scanAction);
+        toolbarManager.add(m_runAction);
         
         bars.updateActionBars();
         
@@ -289,6 +308,10 @@ public class TestResultView extends ViewPart {
     
     // 現在選択されているプロジェクト名を取得するメソッド
     private String getSelectedProjectName() {
+        // インスタンス化前や破棄後に呼ばれても落ちないようにする
+        if (m_projectCombo == null || m_projectCombo.getControl().isDisposed()) {
+            return null;
+        }
         IStructuredSelection selection = (IStructuredSelection) m_projectCombo.getSelection();
         IProject project = (IProject) selection.getFirstElement();
         return (project != null) ? project.getName() : null;
@@ -311,7 +334,7 @@ public class TestResultView extends ViewPart {
             return;
 
         Display.getDefault().asyncExec(() -> {
-            // 1. グループを探す
+            // グループを探す
             TestGroup group = m_instance.m_testGroups.stream()
                     .filter(g -> g.name.equals(groupName))
                     .findFirst().orElse(null);
@@ -322,12 +345,11 @@ public class TestResultView extends ViewPart {
                 m_instance.m_viewer.refresh(); // 新しいグループが出たので全体更新
             }
             
-            // 2. テストを探す
+            // テストを探す
             TestCase target = group.cases.stream()
                     .filter(tc -> tc.testName.equals(testName))
                     .findFirst().orElse(null);
             
-            boolean isTestedNext = isTested;
             if (target == null) {
                 target = new TestCase(group, testName);
                 group.cases.add(target);
@@ -335,13 +357,13 @@ public class TestResultView extends ViewPart {
                 m_instance.m_viewer.setChecked(target,  true);
                 m_instance.updateGroupCheckState(group);
                 m_instance.m_viewer.expandToLevel(group, 1); // 自動で展開
-            } else if (!isTested) {
-                // 未テスト状態として登録しようとしているが、既にある場合は既にある結果をそのまま使う
-                isTestedNext = target.tested;
             }
-            
-            target.success = isSuccess;
-            target.tested = isTestedNext;
+            // テスト済みとして登録する場合は引数の値を設定する
+            if (isTested) {
+                target.success = isSuccess;
+                target.tested = isTested;
+            }
+
             m_instance.m_viewer.update(new Object[] {target, target.group}, null);
         });
     }
@@ -362,9 +384,46 @@ public class TestResultView extends ViewPart {
         }
     }
 
+    // テストを実行する
+    private void launchTests(ILaunchConfiguration targetConfig, String projectName) {
+        try {
+            if (targetConfig != null) {
+                // デバッグモードで起動 (ILaunchManager.DEBUG_MODE)
+                // 第2引数は true にすると、起動前にビルドを実行してくれます
+                DebugUITools.launch(targetConfig, ILaunchManager.DEBUG_MODE);
+                m_runAction.setToolTipText(runActionTooltipBase + " with " + targetConfig.getName());
+            } else {
+                System.err.println("No Launch Configuration found for: " + projectName);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private ILaunchConfiguration findConfiguration(String projectName) {
+        ILaunchConfiguration targetConfig = null;
+        try {
+            ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
+            ILaunchConfiguration[] configs = manager.getLaunchConfigurations();
+            
+    
+            // プロジェクト名が含まれるデバッグ構成を探す
+            for (ILaunchConfiguration config : configs) {
+                // e2 studioの標準的な構成名や、属性からプロジェクト名をチェック
+                String name = config.getName();
+                if (name.contains(projectName)) {
+                    targetConfig = config;
+                    break;
+                }
+            }
+        } catch (CoreException e) {
+            e.printStackTrace();
+        }
+        
+        return targetConfig;
+    }
 
-
-    // ツールバーにコントロールを埋め込むためのクラス
+    // ツールバーにコンボボックスを埋め込むためのクラス
     private class ProjectComboContribution extends ControlContribution {
         protected ProjectComboContribution(String id) {
             super(id);
@@ -399,6 +458,67 @@ public class TestResultView extends ViewPart {
             });
 
             return combo;
+        }
+    }
+
+    // デバッグ構成をリストアップしてメニュー（▼の中身）を生成するクラス
+    private class LaunchConfigurationMenuCreator implements IMenuCreator {
+        private Menu menu;
+        private TestResultView view; // View本体を参照
+        private ILaunchConfiguration lastSelectedConfig; // 最後に選んだ構成を保持
+
+        public LaunchConfigurationMenuCreator(TestResultView view) {
+            this.view = view;
+        }
+
+        @Override
+        public void dispose() {
+            if (menu != null) {
+                menu.dispose();
+                menu = null;
+            }
+        }
+
+        @Override
+        public Menu getMenu(Control parent) {
+            if (menu != null) menu.dispose();
+            menu = new Menu(parent);
+
+            // メニューが開かれた時点でプロジェクト名を取得する
+            String projectName = view.getSelectedProjectName();
+            if (projectName == null) return menu; 
+
+            try {
+                ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
+                ILaunchConfiguration[] configs = manager.getLaunchConfigurations();
+
+                for (final ILaunchConfiguration config : configs) {
+                    String configProj = config.getAttribute("org.eclipse.cdt.launch.PROJECT_ATTR", "");
+                    if (configProj.equals(projectName) || config.getName().contains(projectName)) {
+                     // 各デバッグ構成をメニュー項目（Action）として追加
+                        Action configAction = new Action(config.getName()) {
+                            @Override
+                            public void run() {
+                                lastSelectedConfig = config;
+                                // 実行ロジックを呼び出す（後述のメインActionのrun相当）
+                                launchTests(config, configProj);
+                            }
+                        };
+                        ActionContributionItem item = new ActionContributionItem(configAction);
+                        item.fill(menu, -1);
+                    }
+                }
+            } catch (CoreException e) {
+                e.printStackTrace();
+            }
+            return menu;
+        }
+
+        @Override
+        public Menu getMenu(Menu parent) { return null; }
+        
+        public ILaunchConfiguration getLastSelectedConfig() {
+            return lastSelectedConfig;
         }
     }
 }
