@@ -24,7 +24,7 @@ public class TestScanner {
     private static final Pattern TEST_PATTERN = 
         Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
 
-    public static void scanProject(String projectName) {
+    public static void scanProjectTestCase(String projectName) {
      // Jobの作成
         Job job = new Job("Scanning CppUTest cases in " + projectName) {
             @Override

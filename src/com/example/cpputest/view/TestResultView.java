@@ -16,6 +16,7 @@ import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ComboViewer;
+import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.jface.viewers.StructuredSelection;
@@ -271,10 +272,8 @@ public class TestResultView extends ViewPart {
         m_scanAction = new org.eclipse.jface.action.Action("Scan") {
             @Override
             public void run() {
-                String projectName = getSelectedProjectName();
-                if (projectName == null) return; // プロジェクト未選択なら何もしない
-                
-                TestScanner.scanProject(projectName);
+                refreshProjectList();
+                scanProjectTestCase();
             }
         };
 
@@ -376,12 +375,31 @@ public class TestResultView extends ViewPart {
                 .filter(IProject::isOpen)
                 .collect(Collectors.toList());
         
+        boolean isFirst = (m_projectCombo.getInput() == null);
+        int selectIndex = 0;
+        if (!isFirst) {
+            // 最初に呼ばれたとき以外は現在選択されているプロジェクトのインデックスを覚えておく
+            StructuredSelection selectionTmp = (StructuredSelection)m_projectCombo.getSelection();
+            int index = openProjects.indexOf(selectionTmp.getFirstElement());
+            if (!selectionTmp.isEmpty() && index != -1) {
+                selectIndex = index;
+            }
+        }
+        
+        // プロジェクトリストをコンボボックスにセット
         m_projectCombo.setInput(openProjects);
         
         if (openProjects != null && !openProjects.isEmpty()) {
-            // 最初のプロジェクトを選択状態にする
-            m_projectCombo.setSelection(new StructuredSelection(openProjects.get(0)));
+            // プロジェクトを選択状態にする
+            m_projectCombo.setSelection(new StructuredSelection(openProjects.get(selectIndex)));
         }
+    }
+    
+    private void scanProjectTestCase() {
+        String projectName = getSelectedProjectName();
+        if (projectName == null) return; // プロジェクト未選択なら何もしない
+        
+        TestScanner.scanProjectTestCase(projectName);
     }
 
     // テストを実行する
@@ -453,7 +471,7 @@ public class TestResultView extends ViewPart {
             // 選択変更時のイベント
             m_projectCombo.addSelectionChangedListener(event -> {
                 if (m_scanAction != null) {
-                    m_scanAction.run(); // 切り替え時もScanボタンのrunを呼ぶ
+                    scanProjectTestCase();
                 }
             });
 
