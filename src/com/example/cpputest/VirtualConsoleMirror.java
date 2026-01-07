@@ -50,11 +50,13 @@ public class VirtualConsoleMirror {
             st.addPaintListener((e) -> {
                 Integer id = System.identityHashCode(e.getSource());
                 String currentText = st.getText();
+                
                 String lastProcessedText = lastProcessedTextMap.get(id);
-                if (currentText.contains("#include") && !currentText.contains("TEST(")) {
+                if (currentText.contains("#include") || !currentText.contains("TEST(")) {
                     // 関係ないテキストは無視する
                     return;
                 }
+                System.out.println("getText() : " + currentText);
                 // 全く同じ内容なら処理をスキップ（CPU負荷軽減）
                 if (currentText != null && !currentText.equals(lastProcessedText)) {
                     // 増分（新しく追加された文字）を特定
