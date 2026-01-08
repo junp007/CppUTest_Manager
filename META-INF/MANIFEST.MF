@@ -1,9 +1,11 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: Cpputest
+Bundle-Name: CppUTestPlugin
 Bundle-SymbolicName: com.example.cpputest; singleton:=true
 Bundle-Version: 1.0.0.qualifier
+Export-Package: com.example.cpputest.view
 Bundle-Activator: com.example.cpputest.Activator
+Bundle-ClassPath: .
 Bundle-Vendor: junp
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
@@ -15,7 +17,7 @@ Require-Bundle: org.eclipse.ui,
  org.eclipse.cdt.core;bundle-version="8.4.201",
  org.eclipse.cdt.managedbuilder.core;bundle-version="9.7.100",
  org.eclipse.jdt.ui;bundle-version="3.32.100"
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-11
 Automatic-Module-Name: com.example.cpputest
 Bundle-ActivationPolicy: lazy
 Bundle-Localization: plugin

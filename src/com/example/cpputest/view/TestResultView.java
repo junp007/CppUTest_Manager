@@ -186,7 +186,6 @@ public class TestResultView extends ViewPart {
                 Object element = event.getElement();
                 if (element instanceof TestGroup) {
                     TestGroup group = (TestGroup) element;
-                    System.out.println("展開されました: " + group.getName());
                     group.expand = true;
                 }
             }
@@ -197,7 +196,6 @@ public class TestResultView extends ViewPart {
                 Object element = event.getElement();
                 if (element instanceof TestGroup) {
                     TestGroup group = (TestGroup) element;
-                    System.out.println("閉じられました: " + group.getName());
                     group.expand = false;
                 }
             }

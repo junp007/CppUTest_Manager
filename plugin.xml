@@ -13,8 +13,7 @@
             id="com.example.cpputest.view.TestResultView"
             name="CppUTest Results"
             class="com.example.cpputest.view.TestResultView"
-            category="com.example.cpputest.category"
-            icon="icons/sample.gif">
+            category="com.example.cpputest.category">
         </view>
     </extension>
 </plugin>
