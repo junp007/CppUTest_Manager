@@ -5,6 +5,8 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
+import org.eclipse.jface.viewers.ITreeViewerListener;
+import org.eclipse.jface.viewers.TreeExpansionEvent;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.dialogs.MessageDialog;
@@ -68,9 +70,11 @@ public class TestResultView extends ViewPart {
     public static class TestGroup {
         private String name;
         List<TestCase> cases = new ArrayList<>();
+        private boolean expand;
         
         TestGroup(String name) {
             this.name = name;
+            this.expand = true;
         }
         
         public String getName() {
@@ -174,6 +178,30 @@ public class TestResultView extends ViewPart {
                 updateGroupCheckState(tc.getGroup());
             }
         });
+        
+        m_treeViewer.addTreeListener(new ITreeViewerListener() {
+            @Override
+            public void treeExpanded(TreeExpansionEvent event) {
+                // グループが開かれた時の処理
+                Object element = event.getElement();
+                if (element instanceof TestGroup) {
+                    TestGroup group = (TestGroup) element;
+                    System.out.println("展開されました: " + group.getName());
+                    group.expand = true;
+                }
+            }
+
+            @Override
+            public void treeCollapsed(TreeExpansionEvent event) {
+                // グループが閉じられた時の処理
+                Object element = event.getElement();
+                if (element instanceof TestGroup) {
+                    TestGroup group = (TestGroup) element;
+                    System.out.println("閉じられました: " + group.getName());
+                    group.expand = false;
+                }
+            }
+        });
     }
     
     // --- 背景色を決定する共通メソッド ---
@@ -231,7 +259,6 @@ public class TestResultView extends ViewPart {
         }
     }
 
-    private String runActionTooltipBase = "Run selected CppUTest cases";
     // ツールバーを作成
     private void createToolbar() {
         // main生成ボタンのアクション
@@ -296,9 +323,9 @@ public class TestResultView extends ViewPart {
         generateAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.jdt.ui", "icons/full/eview16/source.png"));
           
-        scanProjectAction.setToolTipText("Scan Projects");
-        generateAction.setToolTipText(runActionTooltipBase);
-//        scanTestCaseAction.setToolTipText("Scan CppUTest cases");
+        scanProjectAction.setToolTipText("プロジェクトのスキャンを行う");
+        setupAction.setToolTipText("CppUTest用の設定を行う");
+        generateAction.setToolTipText("現在のチェック状態のgenerated_main.cppを生成する");
         
         // ビューのツールバーにボタンを追加
         IActionBars bars = getViewSite().getActionBars();
@@ -382,6 +409,7 @@ public class TestResultView extends ViewPart {
         });
     }
     
+    // コンボボックスでプロジェクトが変更されたときに呼ばれる
     public void changeProject(String oldProjectName, String newProjectName) {
         if (oldProjectName != null && !oldProjectName.isEmpty()) {
             // 変更前のプロジェクトの情報を保存する
@@ -393,22 +421,18 @@ public class TestResultView extends ViewPart {
         m_treeViewer.refresh();
         
         if (m_testGroupMap.containsKey(newProjectName)) {
-            // 保存されているグループに変えた場合は保存されている情報で更新する
+            // 保存されているプロジェクトに変えた場合は保存されている情報で更新する
             m_testGroups.addAll(m_testGroupMap.get(newProjectName));
             m_treeViewer.refresh();
             m_testGroups.forEach(tg -> {
-                m_treeViewer.expandToLevel(tg, 1); // 自動で展開
-                applyGroupCheckState(tg);   // グループのチェック状態をツリーに反映
+                m_treeViewer.expandToLevel(tg, tg.expand ? 1 : 0); // グループの展開状態をツリーに反映
+                tg.cases.forEach(tc -> m_treeViewer.setChecked(tc, tc.checked)); // グループ内の各チェック状態をツリーに反映
+                updateGroupCheckState(tg);  // グループのチェック状態を反映
             });
-            
         } else {
+            // 保存されてないプロジェクトの場合はスキャンする
             scanProjectTestCase(newProjectName);
         }
-    }
-    
-    public void applyGroupCheckState(TestGroup group) {
-        group.cases.forEach(tc -> m_treeViewer.setChecked(tc, tc.checked));
-        updateGroupCheckState(group);
     }
     
     public void scanProjectTestCase(String projectName) {
