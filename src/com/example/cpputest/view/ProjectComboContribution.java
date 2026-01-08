@@ -21,6 +21,7 @@ import org.eclipse.swt.widgets.Control;
 public class ProjectComboContribution extends ControlContribution {
     private ComboViewer m_projectCombo;
     private TestResultView m_resultView;
+    private String m_lastProjectName;
     
     protected ProjectComboContribution(String id, TestResultView resultView) {
         super(id);
@@ -50,10 +51,14 @@ public class ProjectComboContribution extends ControlContribution {
 
         // 選択変更時のイベント
         m_projectCombo.addSelectionChangedListener(event -> {
+            String newProjectName = getSelectedProjectName();
             // プロジェクトのテストケースをスキャンする
-            m_resultView.scanProjectTestCase();
+            m_resultView.changeProject(m_lastProjectName, newProjectName);
+            m_lastProjectName = newProjectName;
         });
-
+        
+        m_lastProjectName = getSelectedProjectName();
+        
         return combo;
     }
     

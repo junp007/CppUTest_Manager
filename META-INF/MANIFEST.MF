@@ -13,7 +13,8 @@ Require-Bundle: org.eclipse.ui,
  org.eclipse.debug.core;bundle-version="3.21.400",
  org.eclipse.debug.ui;bundle-version="3.18.400",
  org.eclipse.cdt.core;bundle-version="8.4.201",
- org.eclipse.cdt.managedbuilder.core;bundle-version="9.7.100"
+ org.eclipse.cdt.managedbuilder.core;bundle-version="9.7.100",
+ org.eclipse.jdt.ui;bundle-version="3.32.100"
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Automatic-Module-Name: com.example.cpputest
 Bundle-ActivationPolicy: lazy

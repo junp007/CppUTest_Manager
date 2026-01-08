@@ -52,7 +52,7 @@ public class VirtualConsoleMirror {
                 String currentText = st.getText();
                 
                 String lastProcessedText = lastProcessedTextMap.get(id);
-                if (currentText.contains("#include") || !currentText.contains("TEST(")) {
+                if (currentText.contains("#include")) {
                     // 関係ないテキストは無視する
                     return;
                 }

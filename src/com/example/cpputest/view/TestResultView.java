@@ -2,12 +2,6 @@ package com.example.cpputest.view;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.CoreException;
-import org.eclipse.debug.core.DebugPlugin;
-import org.eclipse.debug.core.ILaunchConfiguration;
-import org.eclipse.debug.core.ILaunchManager;
-import org.eclipse.debug.ui.DebugUITools;
-import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
@@ -21,21 +15,22 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.part.ViewPart;
+import org.eclipse.ui.plugin.AbstractUIPlugin;
 
 import com.example.cpputest.CppUTestSetupHandler;
 import com.example.cpputest.TestRunnerGenerator;
 import com.example.cpputest.parser.TestScanner;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class TestResultView extends ViewPart {
-//    public static final String ID = "com.example.cpputest.view.TestResultView";
-//    private ComboViewer m_projectCombo;
     private ProjectComboContribution m_projComboContribution;
-    private org.eclipse.jface.action.Action m_runAction;
     private CheckboxTreeViewer m_treeViewer;
     private List<TestGroup> m_testGroups = new ArrayList<>();
+    private Map<String, List<TestGroup>> m_testGroupMap = new HashMap<String, List<TestGroup>>();
     
     // テストケースのデータを保持する簡単な内部クラス
     public static class TestCase {
@@ -43,12 +38,14 @@ public class TestResultView extends ViewPart {
         private String testName;
         private boolean success;
         private boolean tested;
+        private boolean checked;
 
         public TestCase(TestGroup group, String testName) {
           this.group = group;
           this.testName = testName;
           this.success = false;
           this.tested = false;
+          this.checked = true;
         }
 
         public TestGroup getGroup() {
@@ -83,6 +80,11 @@ public class TestResultView extends ViewPart {
         public List<TestCase> getCases() {
             return cases;
         }
+        
+        // グループ配下のテストケースすべてのチェック状態を設定する
+        public void setChecked(boolean checked) {
+            cases.stream().forEach(tc -> tc.checked = checked);
+        }
     }
 
     
@@ -97,7 +99,7 @@ public class TestResultView extends ViewPart {
     // チェックボックス付きのテーブルビューアを作成
     private void createTreeViewer(Composite parent) {
      // TreeViewer の作成
-        m_treeViewer = new CheckboxTreeViewer(parent, SWT.BORDER | SWT.MULTI | SWT.FULL_SELECTION | SWT.CHECK);
+        m_treeViewer = new CheckboxTreeViewer(parent, SWT.BORDER | SWT.MULTI | SWT.CHECK);
         m_treeViewer.getTree().setHeaderVisible(true);
         m_treeViewer.getTree().setLinesVisible(true);
         m_treeViewer.getControl().setLayoutData(new GridData(GridData.FILL_BOTH));
@@ -164,9 +166,11 @@ public class TestResultView extends ViewPart {
                 // グレー表示を解除し、すべてチェックまたは未チェックに統一
                 m_treeViewer.setGrayed(element, false); 
                 m_treeViewer.setSubtreeChecked(element, checked);
+                ((TestGroup)element).setChecked(checked);
             } else if (element instanceof TestCase) {
                 // 2. 子（Case）が操作された場合、親（Group）の状態を再計算する
                 TestCase tc = (TestCase) element;
+                tc.checked = checked;
                 updateGroupCheckState(tc.getGroup());
             }
         });
@@ -227,43 +231,30 @@ public class TestResultView extends ViewPart {
         }
     }
 
-    private LaunchConfigurationMenuCreator menuCreator;
     private String runActionTooltipBase = "Run selected CppUTest cases";
     // ツールバーを作成
     private void createToolbar() {
-        // 実行ボタンのアクションを定義
-        m_runAction = new org.eclipse.jface.action.Action("Run", Action.AS_DROP_DOWN_MENU) {
+        // main生成ボタンのアクション
+        org.eclipse.jface.action.Action generateAction = new org.eclipse.jface.action.Action("Generate") {
             @Override
             public void run() {
                 String projectName = m_projComboContribution.getSelectedProjectName();
-                if (projectName == null) return; // プロジェクト未選択なら何もしない
+                if (projectName == null)
+                    return; // プロジェクト未選択なら何もしない
 
-                // チェックされている項目を取得
-                Object[] checkedElements = m_treeViewer.getCheckedElements();
-                // mainファイルを生成
-                TestRunnerGenerator.generateMain(projectName, checkedElements, m_testGroups);
-                
-                // 最後に選んだ構成があればそれを使う、なければ自動で探す
-                ILaunchConfiguration config = menuCreator.getLastSelectedConfig();
-                if (config == null) {
-                    // 最後に選んだ構成が無ければプロジェクト名で構成を探す
-                    config = findConfiguration(projectName);
+                boolean confirm = MessageDialog.openQuestion(getViewSite().getShell(), "Generate",
+                        "プロジェクト '" + projectName + "' に CppUTest のmain関数ファイルの生成を行いますか？");
+
+                if (confirm) {
+                    // チェックされている項目を取得
+                    Object[] checkedElements = m_treeViewer.getCheckedElements();
+                    // mainファイルを生成
+                    TestRunnerGenerator.generateMain(projectName, checkedElements, m_testGroups);
                 }
-                launchTests(config, projectName);
             }
         };
 
-        // アイコンの設定
-//        runAction.setImageDescriptor(org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().
-//        		getImageDescriptor(org.eclipse.ui.ISharedImages.IMG_ETOOL_SAVEAS_EDIT));
-
-        org.eclipse.jface.action.Action scanTestCaseAction = new org.eclipse.jface.action.Action("Scan") {
-            @Override
-            public void run() {
-                scanProjectTestCase();
-            }
-        };
-        
+        // 初期設定ボタンのアクション
         org.eclipse.jface.action.Action setupAction = new org.eclipse.jface.action.Action("Setting") {
             @Override
             public void run() {
@@ -285,6 +276,7 @@ public class TestResultView extends ViewPart {
             }
         };
         
+        // プロジェクトのスキャンボタンのアクション
         org.eclipse.jface.action.Action scanProjectAction = new org.eclipse.jface.action.Action("Scan") {
             @Override
             public void run() {
@@ -292,9 +284,21 @@ public class TestResultView extends ViewPart {
             }
         };
 
+        // アイコンの設定
+//        setupAction.setImageDescriptor(org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().
+//                getImageDescriptor(org.eclipse.ui.ISharedImages.IMG_ETOOL_HOME_NAV));
+        scanProjectAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
+                "org.eclipse.jdt.ui", "icons/full/elcl16/refresh.png"));
+        setupAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
+                "org.eclipse.ui", "icons/full/etool16/tricks.png"));
+//        scanTestCaseAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
+//                "org.eclipse.ui", "icons/full/elcl16/synced.png"));
+        generateAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
+                "org.eclipse.jdt.ui", "icons/full/eview16/source.png"));
+          
         scanProjectAction.setToolTipText("Scan Projects");
-        m_runAction.setToolTipText(runActionTooltipBase);
-        scanTestCaseAction.setToolTipText("Scan CppUTest cases");
+        generateAction.setToolTipText(runActionTooltipBase);
+//        scanTestCaseAction.setToolTipText("Scan CppUTest cases");
         
         // ビューのツールバーにボタンを追加
         IActionBars bars = getViewSite().getActionBars();
@@ -302,11 +306,6 @@ public class TestResultView extends ViewPart {
         
         // プロジェクト選択コンボボックスを最初に追加
         m_projComboContribution = new ProjectComboContribution("projectSelector", this);
-        
-        // ▼ メニューの紐付け
-        menuCreator = new LaunchConfigurationMenuCreator(this);
-        m_runAction.setMenuCreator(menuCreator);
-        
         
         // プロジェクト選択コンボボックス
         toolbarManager.add(m_projComboContribution);
@@ -319,14 +318,14 @@ public class TestResultView extends ViewPart {
         // セパレーター（区切り線）
         toolbarManager.add(new Separator());
         // Scanボタン
-        toolbarManager.add(scanTestCaseAction);
-        // Runボタン
-        toolbarManager.add(m_runAction);
+//        toolbarManager.add(scanTestCaseAction);
+        // Generateボタン
+        toolbarManager.add(generateAction);
         
         bars.updateActionBars();
         
-        if (m_projComboContribution.getSelectedProjectName() != null) {
-            scanTestCaseAction.run(); // Scanボタンの処理を直接呼び出す
+        if (getSelectedProjectName() != null) {
+            scanProjectTestCase(getSelectedProjectName());
         }
     }
     
@@ -369,9 +368,9 @@ public class TestResultView extends ViewPart {
                 target = new TestCase(group, testName);
                 group.cases.add(target);
                 m_instance.m_treeViewer.refresh(group); // グループ配下を更新
-                m_instance.m_treeViewer.setChecked(target,  true);
-                m_instance.updateGroupCheckState(group);
                 m_instance.m_treeViewer.expandToLevel(group, 1); // 自動で展開
+                m_instance.m_treeViewer.setChecked(target, target.checked);  // テストケースのチェック状態を反映
+                m_instance.updateGroupCheckState(group);    // グループのチェック状態を確認
             }
             // テスト済みとして登録する場合は引数の値を設定する
             if (isTested) {
@@ -383,52 +382,39 @@ public class TestResultView extends ViewPart {
         });
     }
     
-    public void scanProjectTestCase() {
+    public void changeProject(String oldProjectName, String newProjectName) {
+        if (oldProjectName != null && !oldProjectName.isEmpty()) {
+            // 変更前のプロジェクトの情報を保存する
+            m_testGroupMap.put(oldProjectName, new ArrayList<TestGroup>(m_testGroups));
+        }
+        
         // 現在表示されているデータをクリアする
         m_testGroups.clear();
         m_treeViewer.refresh();
-        String projectName = m_projComboContribution.getSelectedProjectName();
+        
+        if (m_testGroupMap.containsKey(newProjectName)) {
+            // 保存されているグループに変えた場合は保存されている情報で更新する
+            m_testGroups.addAll(m_testGroupMap.get(newProjectName));
+            m_treeViewer.refresh();
+            m_testGroups.forEach(tg -> {
+                m_treeViewer.expandToLevel(tg, 1); // 自動で展開
+                applyGroupCheckState(tg);   // グループのチェック状態をツリーに反映
+            });
+            
+        } else {
+            scanProjectTestCase(newProjectName);
+        }
+    }
+    
+    public void applyGroupCheckState(TestGroup group) {
+        group.cases.forEach(tc -> m_treeViewer.setChecked(tc, tc.checked));
+        updateGroupCheckState(group);
+    }
+    
+    public void scanProjectTestCase(String projectName) {
         if (projectName == null) return; // プロジェクト未選択なら何もしない
         
         TestScanner.scanProjectTestCase(projectName);
-    }
-
-    // テストを実行する
-    public void launchTests(ILaunchConfiguration targetConfig, String projectName) {
-        try {
-            if (targetConfig != null) {
-                // デバッグモードで起動 (ILaunchManager.DEBUG_MODE)
-                DebugUITools.launch(targetConfig, ILaunchManager.DEBUG_MODE);
-                m_runAction.setToolTipText(runActionTooltipBase + " with " + targetConfig.getName());
-            } else {
-                System.err.println("No Launch Configuration found for: " + projectName);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    
-    private ILaunchConfiguration findConfiguration(String projectName) {
-        ILaunchConfiguration targetConfig = null;
-        try {
-            ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
-            ILaunchConfiguration[] configs = manager.getLaunchConfigurations();
-            
-    
-            // プロジェクト名が含まれるデバッグ構成を探す
-            for (ILaunchConfiguration config : configs) {
-                // e2 studioの標準的な構成名や、属性からプロジェクト名をチェック
-                String name = config.getName();
-                if (name.contains(projectName)) {
-                    targetConfig = config;
-                    break;
-                }
-            }
-        } catch (CoreException e) {
-            e.printStackTrace();
-        }
-        
-        return targetConfig;
     }
 
     public String getSelectedProjectName() {
