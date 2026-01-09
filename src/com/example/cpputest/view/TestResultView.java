@@ -316,8 +316,6 @@ public class TestResultView extends ViewPart {
                 "org.eclipse.jdt.ui", "icons/full/elcl16/refresh.png"));
         setupAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.ui", "icons/full/etool16/tricks.png"));
-//        scanTestCaseAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
-//                "org.eclipse.ui", "icons/full/elcl16/synced.png"));
         generateAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.jdt.ui", "icons/full/eview16/source.png"));
           
@@ -342,8 +340,6 @@ public class TestResultView extends ViewPart {
         toolbarManager.add(setupAction);
         // セパレーター（区切り線）
         toolbarManager.add(new Separator());
-        // Scanボタン
-//        toolbarManager.add(scanTestCaseAction);
         // Generateボタン
         toolbarManager.add(generateAction);
         
