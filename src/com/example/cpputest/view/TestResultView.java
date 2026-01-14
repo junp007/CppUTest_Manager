@@ -33,7 +33,7 @@ public class TestResultView extends ViewPart {
     private CheckboxTreeViewer m_treeViewer;
     private List<TestGroup> m_testGroups = new ArrayList<>();
     private Map<String, List<TestGroup>> m_testGroupMap = new HashMap<String, List<TestGroup>>();
-    
+    IActionBars bars;
     // テストケースのデータを保持する簡単な内部クラス
     public static class TestCase {
         private TestGroup group;
@@ -306,6 +306,7 @@ public class TestResultView extends ViewPart {
             @Override
             public void run() {
                 m_projComboContribution.refreshProjectList();
+                bars.updateActionBars();
             }
         };
 
@@ -324,7 +325,7 @@ public class TestResultView extends ViewPart {
         generateAction.setToolTipText("現在のチェック状態のgenerated_main.cppを生成する");
         
         // ビューのツールバーにボタンを追加
-        IActionBars bars = getViewSite().getActionBars();
+        bars = getViewSite().getActionBars();
         IToolBarManager toolbarManager = bars.getToolBarManager();
         
         // プロジェクト選択コンボボックスを最初に追加
@@ -423,10 +424,10 @@ public class TestResultView extends ViewPart {
                 tg.cases.forEach(tc -> m_treeViewer.setChecked(tc, tc.checked)); // グループ内の各チェック状態をツリーに反映
                 updateGroupCheckState(tg);  // グループのチェック状態を反映
             });
-        } else {
-            // 保存されてないプロジェクトの場合はスキャンする
-            scanProjectTestCase(newProjectName);
         }
+        
+        // テストケースをスキャンする
+        scanProjectTestCase(newProjectName);
     }
     
     public void scanProjectTestCase(String projectName) {

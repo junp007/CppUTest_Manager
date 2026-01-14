@@ -79,11 +79,12 @@ public class CppUTestSetupHandler {
             for (ICLanguageSetting lang : langSettings) {
                 String languageId = lang.getLanguageId();
                 // CおよびC++のソースに対して適用
-                if (languageId.contains("gcc") || languageId.contains("g++")) {
+                if (languageId != null && (languageId.contains("gcc") || languageId.contains("g++"))) {
                     // --- インクルードパスの追加 ---
                     List<ICLanguageSettingEntry> entries = lang.getSettingEntriesList(ICSettingEntry.INCLUDE_PATH);
                     // プロジェクト相対パスで "${ProjName}/src/cpputest/include" を追加
                     AddSettingIfNotExist(entries, new CIncludePathEntry("/${ProjName}/src/cpputest/include", ICSettingEntry.VALUE_WORKSPACE_PATH));
+                    AddSettingIfNotExist(entries, new CIncludePathEntry("/${ProjName}/src/cpputest_gen", ICSettingEntry.VALUE_WORKSPACE_PATH));
                     AddSettingIfNotExist(entries, new CIncludePathEntry("/${ProjName}/src/TargetCode", ICSettingEntry.VALUE_WORKSPACE_PATH));
                     lang.setSettingEntries(ICSettingEntry.INCLUDE_PATH, entries);
 
