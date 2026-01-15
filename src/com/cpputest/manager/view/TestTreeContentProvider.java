@@ -4,14 +4,13 @@ import org.eclipse.jface.viewers.ITreeContentProvider;
 
 import com.cpputest.manager.view.TestResultView.TestCase;
 import com.cpputest.manager.view.TestResultView.TestGroup;
-
-import java.util.List;
+import com.cpputest.manager.view.TestResultView.TestProject;
 
 public class TestTreeContentProvider implements ITreeContentProvider {
     @Override
     public Object[] getElements(Object inputElement) {
         // ルート要素としてグループの一覧を返す
-        return ((List<?>) inputElement).toArray();
+        return ((TestProject)inputElement).getTestGroups().toArray();
     }
 
     @Override

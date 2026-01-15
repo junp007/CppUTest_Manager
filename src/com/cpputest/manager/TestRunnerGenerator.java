@@ -16,10 +16,11 @@ import org.eclipse.core.runtime.Path;
 
 import com.cpputest.manager.view.TestResultView.TestCase;
 import com.cpputest.manager.view.TestResultView.TestGroup;
+import com.cpputest.manager.view.TestResultView.TestProject;
 
 public class TestRunnerGenerator {
 
-    public static void generateCppUTestRun(String projectName, Object[] checkedElements, List<TestGroup> allGroups) {
+    public static void generateCppUTestRun(String projectName, Object[] checkedElements, TestProject testProject) {
      // 高速判定のために配列を Set に変換（お作法）
         Set<Object> checkedSet = new HashSet<>(Arrays.asList(checkedElements));
         
@@ -50,7 +51,7 @@ public class TestRunnerGenerator {
             sb.append("    const char* args[] = {\"test\", \"-v\"");
 
             // 引数の生成処理
-            for (TestGroup gp : allGroups) {
+            for (TestGroup gp : testProject) {
                 // そのグループ内の「チェックされているテスト」を抽出
                 List<TestCase> selectedInGroup = gp.getCases().stream().filter(tc -> checkedSet.contains(tc)).collect(Collectors.toList());
                 if (selectedInGroup.isEmpty()) {

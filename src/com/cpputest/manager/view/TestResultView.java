@@ -3,8 +3,11 @@ package com.cpputest.manager.view;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jface.action.IToolBarManager;
+import org.eclipse.jface.viewers.CheckStateChangedEvent;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
+import org.eclipse.jface.viewers.ICheckStateListener;
+import org.eclipse.jface.viewers.ICheckStateProvider;
 import org.eclipse.jface.viewers.ITreeViewerListener;
 import org.eclipse.jface.viewers.TreeExpansionEvent;
 import org.eclipse.jface.viewers.TreeViewerColumn;
@@ -22,24 +25,34 @@ import org.eclipse.ui.plugin.AbstractUIPlugin;
 import com.cpputest.manager.CppUTestSetupHandler;
 import com.cpputest.manager.TestRunnerGenerator;
 import com.cpputest.manager.parser.TestScanner;
+import com.cpputest.manager.view.TestResultView.TestCase;
+import com.cpputest.manager.view.TestResultView.TestGroup;
+import com.cpputest.manager.view.TestResultView.TestGroup.CheckState;
 
+import java.io.Console;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 public class TestResultView extends ViewPart {
     private ProjectComboContribution m_projComboContribution;
     private CheckboxTreeViewer m_treeViewer;
-    private List<TestGroup> m_testGroups = new ArrayList<>();
-    private Map<String, List<TestGroup>> m_testGroupMap = new HashMap<String, List<TestGroup>>();
-    IActionBars bars;
+    private TestProject m_testProject = new TestProject();
+    private Map<String, TestProject> m_testProjectMap = new HashMap<String, TestProject>();
+    IActionBars toolbars;
     // テストケースのデータを保持する簡単な内部クラス
     public static class TestCase {
+        // 属しているグループ
         private TestGroup group;
+        // テスト名
         private String testName;
+        // テスト結果が成功かどうか
         private boolean success;
+        // テスト済みかどうか
         private boolean tested;
+        // テスト対象かどうか
         private boolean checked;
 
         public TestCase(TestGroup group, String testName) {
@@ -61,18 +74,37 @@ public class TestResultView extends ViewPart {
         public String getFullName() {
             return this.group.getName() + "." + this.getTestName();
         }
+        
+        public void setChecked(boolean isChecked) {
+            this.checked = isChecked;
+        }
 
-        boolean IsSameCase(final String groupName, final String testName) {
+        public boolean isSameCase(final String groupName, final String testName) {
             return this.group.getName().equals(groupName) && this.testName.equals(testName);
+        }
+        
+        public boolean isSuccess() {
+            return tested && success;
+        }
+        
+        public boolean isTested() {
+            return tested;
+        }
+        
+        public boolean isChecked() {
+            return checked;
         }
     }
 
     public static class TestGroup {
+        // テストグループ名
         private String name;
+        // テストケースリスト
         List<TestCase> cases = new ArrayList<>();
+        // 展開されているかどうか
         private boolean expand;
         
-        TestGroup(String name) {
+        public TestGroup(String name) {
             this.name = name;
             this.expand = true;
         }
@@ -87,7 +119,108 @@ public class TestResultView extends ViewPart {
         
         // グループ配下のテストケースすべてのチェック状態を設定する
         public void setChecked(boolean checked) {
-            cases.stream().forEach(tc -> tc.checked = checked);
+            cases.stream().forEach(tc -> tc.setChecked(checked));
+        }
+        
+        public enum CheckState {NonChecked, PartChecked, AllChecked};
+        public CheckState getCheckState() {
+            long checkedCount = cases.stream().filter(tc -> tc.isChecked()).count();
+
+            if (checkedCount == 0) {
+                // すべて未選択
+                return CheckState.NonChecked;
+            } else if (checkedCount == cases.size()) {
+                // すべて選択
+                return CheckState.AllChecked;
+            } else {
+                // 一部選択（グレー表示）
+                return CheckState.PartChecked;
+            }
+        }
+        
+        public void setExpand(boolean isExpand) {
+            expand = isExpand;
+        }
+        
+        public boolean isExpand() {
+            return expand;
+        }
+    }
+    
+    public static class TestProject implements Iterable<TestGroup> {
+        // テストグループリスト
+        private List<TestGroup> m_testGroups = new ArrayList<>();
+        // 通知先のリスト
+        private List<Runnable> listeners = new ArrayList<>();
+        
+        public TestProject() {
+        }
+        
+        public TestProject(TestProject other) {
+            this.m_testGroups = new ArrayList<TestGroup>(other.m_testGroups);
+        }
+        
+        public void updateTestResult(String groupName, String testName, boolean isSuccess, boolean isTested) {
+            // グループを探す
+            TestGroup group = m_testGroups.stream()
+                    .filter(g -> g.name.equals(groupName))
+                    .findFirst().orElse(null);
+            
+            if (group == null) {
+                // グループが見つからない場合は新しいグループを作成
+                group = new TestGroup(groupName);
+                m_testGroups.add(group);
+            }
+            
+            // テストケースを探す
+            TestCase target = group.cases.stream()
+                    .filter(tc -> tc.testName.equals(testName))
+                    .findFirst().orElse(null);
+            
+            if (target == null) {
+                // テストケースが見つからない場合は新しいテストケースを作成
+                target = new TestCase(group, testName);
+                group.cases.add(target);
+            }
+            // テスト済みとして登録する場合は引数の値を設定する
+            if (isTested) {
+                target.success = isSuccess;
+                target.tested = isTested;
+            }
+            
+            // 変更を通知
+            notifyChanged();
+        }
+
+        @Override
+        public Iterator<TestGroup> iterator() {
+            return m_testGroups.iterator();
+        }
+        
+        public List<TestGroup> getTestGroups() {
+            return m_testGroups;
+        }
+        
+        public void clear() {
+            m_testGroups.clear();
+            notifyChanged();
+        }
+        
+        public void copy(TestProject other) {
+            m_testGroups.clear();
+            m_testGroups.addAll(other.m_testGroups);
+            notifyChanged();
+        }
+        
+        public void addChangeListener(Runnable listener) {
+            listeners.add(listener);
+        }
+        
+        // データが更新されたときに呼ぶメソッド
+        public void notifyChanged() {
+            for (Runnable listener : listeners) {
+                listener.run();
+            }
         }
     }
 
@@ -155,10 +288,30 @@ public class TestResultView extends ViewPart {
                 return getStatusColor(element);
             }
         });
-        // ... StatusのLabelProvider（色はここで設定）
 
         m_treeViewer.setContentProvider(new TestTreeContentProvider());
-        m_treeViewer.setInput(m_testGroups);
+        m_treeViewer.setCheckStateProvider(new ICheckStateProvider() {
+            @Override
+            public boolean isChecked(Object element) {
+                if (element instanceof TestCase) {
+                    return ((TestCase) element).isChecked();
+                } else if (element instanceof TestGroup) {
+                    CheckState state = ((TestGroup) element).getCheckState();
+                    return state == CheckState.AllChecked || state == CheckState.PartChecked;
+                }
+                return false;
+            }
+
+            @Override
+            public boolean isGrayed(Object element) {
+                if (element instanceof TestGroup) {
+                    CheckState state = ((TestGroup) element).getCheckState();
+                    return state == CheckState.PartChecked;
+                } else {
+                    return false;
+                }
+            }
+        });
 
         // チェック状態が変更されたときに呼ばれる
         m_treeViewer.addCheckStateListener(event -> {
@@ -166,17 +319,11 @@ public class TestResultView extends ViewPart {
             boolean checked = event.getChecked();
 
             if (element instanceof TestGroup) {
-                // 1. 親（Group）が操作された場合、配下の子（TestCase）をすべて同じ状態にする
-                // グレー表示を解除し、すべてチェックまたは未チェックに統一
-                m_treeViewer.setGrayed(element, false); 
-                m_treeViewer.setSubtreeChecked(element, checked);
                 ((TestGroup)element).setChecked(checked);
             } else if (element instanceof TestCase) {
-                // 2. 子（Case）が操作された場合、親（Group）の状態を再計算する
-                TestCase tc = (TestCase) element;
-                tc.checked = checked;
-                updateGroupCheckState(tc.getGroup());
+                ((TestCase)element).setChecked(checked);
             }
+            m_treeViewer.refresh();
         });
         
         m_treeViewer.addTreeListener(new ITreeViewerListener() {
@@ -186,7 +333,7 @@ public class TestResultView extends ViewPart {
                 Object element = event.getElement();
                 if (element instanceof TestGroup) {
                     TestGroup group = (TestGroup) element;
-                    group.expand = true;
+                    group.setExpand(true);
                 }
             }
 
@@ -196,10 +343,32 @@ public class TestResultView extends ViewPart {
                 Object element = event.getElement();
                 if (element instanceof TestGroup) {
                     TestGroup group = (TestGroup) element;
-                    group.expand = false;
+                    group.setExpand(false);
                 }
             }
         });
+        
+        // テストケースのデータ更新イベントハンドラ
+        m_testProject.addChangeListener(() -> {
+            // UIスレッドで実行する必要がある
+            Display.getDefault().asyncExec(() -> {
+                if (!m_treeViewer.getControl().isDisposed()) {
+                    m_treeViewer.refresh();
+                    // モデルのフラグに基づいて展開状態を復元
+                    syncExpandState();
+                }
+            });
+        });
+    
+        m_treeViewer.setInput(m_testProject);
+    }
+    
+    private void syncExpandState() {
+        // モデル（TestProjectなど）内の全グループをループ
+        for (TestGroup group : m_testProject.getTestGroups()) {
+            // 第1引数に要素、第2引数に展開(true)/折り畳み(false)
+            m_treeViewer.setExpandedState(group, group.isExpand());
+        }
     }
     
     // --- 背景色を決定する共通メソッド ---
@@ -303,7 +472,7 @@ public class TestResultView extends ViewPart {
             @Override
             public void run() {
                 m_projComboContribution.refreshProjectList();
-                bars.updateActionBars();
+                toolbars.updateActionBars();
             }
         };
 
@@ -322,8 +491,8 @@ public class TestResultView extends ViewPart {
         generateAction.setToolTipText("CppUtestRun.cppを生成");
         
         // ビューのツールバーにボタンを追加
-        bars = getViewSite().getActionBars();
-        IToolBarManager toolbarManager = bars.getToolBarManager();
+        toolbars = getViewSite().getActionBars();
+        IToolBarManager toolbarManager = toolbars.getToolBarManager();
         
         // プロジェクト選択コンボボックスを最初に追加
         m_projComboContribution = new ProjectComboContribution("projectSelector", this);
@@ -341,7 +510,7 @@ public class TestResultView extends ViewPart {
         // Generateボタン
         toolbarManager.add(generateAction);
         
-        bars.updateActionBars();
+        toolbars.updateActionBars();
         
         if (getSelectedProjectName() != null) {
             scanProjectTestCase(getSelectedProjectName());
@@ -353,7 +522,7 @@ public class TestResultView extends ViewPart {
         // チェックされている項目を取得
         Object[] checkedElements = m_treeViewer.getCheckedElements();
         // CppUtestRunファイルを生成
-        TestRunnerGenerator.generateCppUTestRun(projectName, checkedElements, m_testGroups);
+        TestRunnerGenerator.generateCppUTestRun(projectName, checkedElements, m_testProject);
     }
 
     @Override
@@ -367,66 +536,40 @@ public class TestResultView extends ViewPart {
         m_instance = this;
     }
 
-    // テスト項目を更新する
     public static void updateTestResult(final String groupName, final String testName, final boolean isSuccess, final boolean isTested) {
-        if (m_instance == null)
-            return;
-
-        Display.getDefault().asyncExec(() -> {
-            // グループを探す
-            TestGroup group = m_instance.m_testGroups.stream()
-                    .filter(g -> g.name.equals(groupName))
-                    .findFirst().orElse(null);
-            
-            if (group == null) {
-                group = new TestGroup(groupName);
-                m_instance.m_testGroups.add(group);
-                m_instance.m_treeViewer.refresh(); // 新しいグループが出たので全体更新
-            }
-            
-            // テストを探す
-            TestCase target = group.cases.stream()
-                    .filter(tc -> tc.testName.equals(testName))
-                    .findFirst().orElse(null);
-            
-            if (target == null) {
-                target = new TestCase(group, testName);
-                group.cases.add(target);
-                m_instance.m_treeViewer.refresh(group); // グループ配下を更新
-                m_instance.m_treeViewer.expandToLevel(group, 1); // 自動で展開
-                m_instance.m_treeViewer.setChecked(target, target.checked);  // テストケースのチェック状態を反映
-                m_instance.updateGroupCheckState(group);    // グループのチェック状態を確認
-            }
-            // テスト済みとして登録する場合は引数の値を設定する
-            if (isTested) {
-                target.success = isSuccess;
-                target.tested = isTested;
-            }
-
-            m_instance.m_treeViewer.update(new Object[] {target, target.group}, null);
-        });
+        m_instance.m_testProject.updateTestResult(groupName, testName, isSuccess, isTested);
     }
     
-    // コンボボックスでプロジェクトが変更されたときに呼ばれる
+    // プロジェクトを変更、及び再スキャンするときに呼ばれる
     public void changeProject(String oldProjectName, String newProjectName) {
-        if (oldProjectName != null && !oldProjectName.isEmpty()) {
-            // 変更前のプロジェクトの情報を保存する
-            m_testGroupMap.put(oldProjectName, new ArrayList<TestGroup>(m_testGroups));
+        if (newProjectName == null || newProjectName.isEmpty()) {
+            // プロジェクト未選択なら何もしない
+            return;
         }
         
-        // 現在表示されているデータをクリアする
-        m_testGroups.clear();
-        m_treeViewer.refresh();
-        
-        if (m_testGroupMap.containsKey(newProjectName)) {
-            // 保存されているプロジェクトに変えた場合は保存されている情報で更新する
-            m_testGroups.addAll(m_testGroupMap.get(newProjectName));
-            m_treeViewer.refresh();
-            m_testGroups.forEach(tg -> {
-                m_treeViewer.expandToLevel(tg, tg.expand ? 1 : 0); // グループの展開状態をツリーに反映
-                tg.cases.forEach(tc -> m_treeViewer.setChecked(tc, tc.checked)); // グループ内の各チェック状態をツリーに反映
-                updateGroupCheckState(tg);  // グループのチェック状態を反映
-            });
+        if (oldProjectName == newProjectName) {
+            // プロジェクト変更ではなく、再スキャン時の処理
+            
+        } else {
+            // プロジェクト変更時の処理
+            
+            if (oldProjectName != null && !oldProjectName.isEmpty()) {
+                // 変更前のプロジェクトの情報を保存する
+                m_testProjectMap.put(oldProjectName, new TestProject(m_testProject));
+            }
+            
+            if (m_testProjectMap.containsKey(newProjectName)) {
+                // 保存されているプロジェクトに変えた場合は保存されている情報で更新する
+                m_testProject.copy(m_testProjectMap.get(newProjectName));
+                m_testProject.forEach(tg -> {
+                    m_treeViewer.expandToLevel(tg, tg.expand ? 1 : 0); // グループの展開状態をツリーに反映
+                    tg.cases.forEach(tc -> m_treeViewer.setChecked(tc, tc.checked)); // グループ内の各チェック状態をツリーに反映
+                    updateGroupCheckState(tg);  // グループのチェック状態を反映
+                });
+            }
+            
+            // 現在のテストケースをクリアする
+            m_testProject.clear();
         }
         
         // テストケースをスキャンする
@@ -436,7 +579,7 @@ public class TestResultView extends ViewPart {
     public void scanProjectTestCase(String projectName) {
         if (projectName == null) return; // プロジェクト未選択なら何もしない
         
-        TestScanner.scanProjectTestCase(projectName);
+        TestScanner.scanProjectTestCase(projectName, m_testProject);
     }
 
     public String getSelectedProjectName() {

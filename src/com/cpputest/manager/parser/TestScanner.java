@@ -2,6 +2,7 @@ package com.cpputest.manager.parser;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,6 +16,8 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.jobs.Job;
 
 import com.cpputest.manager.view.TestResultView;
+import com.cpputest.manager.view.TestResultView.TestGroup;
+import com.cpputest.manager.view.TestResultView.TestProject;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -26,7 +29,7 @@ public class TestScanner {
     private static final Pattern TEST_PATTERN = 
         Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
 
-    public static void scanProjectTestCase(String projectName) {
+    public static void scanProjectTestCase(String projectName, TestProject testProject) {
      // Jobの作成
         Job job = new Job("Scanning CppUTest cases in " + projectName) {
             @Override
@@ -50,7 +53,7 @@ public class TestScanner {
                                 String name = proxy.getName();
                                 if (name.endsWith(".cpp")) {
                                     monitor.subTask("Analyzing: " + name);
-                                    parseFile((IFile) proxy.requestResource());
+                                    parseFile((IFile) proxy.requestResource(), testProject);
                                 }
                             }
                             return true; // 子リソースも探索
@@ -71,7 +74,7 @@ public class TestScanner {
         job.schedule(); // 実行キューに入れる
     }
 
-    private static void parseFile(IFile file) {
+    private static void parseFile(IFile file, TestProject testProject) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getContents()))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -80,7 +83,7 @@ public class TestScanner {
                     String group = matcher.group(1);
                     String name = matcher.group(2);
                     // ビューに未完了状態で追加
-                    TestResultView.updateTestResult(group, name, false, false);
+                    testProject.updateTestResult(group, name, false, false);
                 }
             }
         } catch (Exception e) {
