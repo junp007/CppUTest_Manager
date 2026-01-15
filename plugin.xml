@@ -5,15 +5,15 @@
         point="org.eclipse.ui.views">
 
         <category
-            id="com.example.cpputest.category"
+            id="com.cpputest.manager.category"
             name="CppUTest">
         </category>
 
         <view
-            id="com.example.cpputest.view.TestResultView"
-            name="CppUTest Results"
-            class="com.example.cpputest.view.TestResultView"
-            category="com.example.cpputest.category"
+            id="com.cpputest.manager.view"
+            name="CppUTest Manager"
+            class="com.cpputest.manager.view.TestResultView"
+            category="com.cpputest.manager.category"
             icon="icons/CppUTestPlugin@16.png">
         </view>
     </extension>
