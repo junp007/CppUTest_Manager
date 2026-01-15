@@ -1,4 +1,4 @@
-package com.example.cpputest;
+package com.cpputest.manager;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -69,7 +69,7 @@ public class CppUTestSetupHandler {
     private static void configureProjectSettings(IProject project) throws CoreException {
         // プロジェクト記述の取得（書き換え用）
         ICProjectDescription desc = CoreModel.getDefault().getProjectDescription(project, true);
-        
+
         // 全ての構成（Debug/Releaseなど）に対して設定を適用
         ICConfigurationDescription[] configs = desc.getConfigurations();
         for (ICConfigurationDescription config : configs) {

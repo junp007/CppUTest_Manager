@@ -1,4 +1,4 @@
-package com.example.cpputest.parser;
+package com.cpputest.manager.parser;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -12,8 +12,10 @@ import org.eclipse.core.resources.IResourceProxy;
 import org.eclipse.core.resources.IResourceProxyVisitor;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
-import com.example.cpputest.view.TestResultView;
 import org.eclipse.core.runtime.jobs.Job;
+
+import com.cpputest.manager.view.TestResultView;
+
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;

@@ -1,4 +1,4 @@
-package com.example.cpputest.view;
+package com.cpputest.manager.view;
 
 import java.util.Arrays;
 import java.util.List;

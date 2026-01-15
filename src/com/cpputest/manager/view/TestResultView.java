@@ -1,4 +1,4 @@
-package com.example.cpputest.view;
+package com.cpputest.manager.view;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
@@ -19,9 +19,9 @@ import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 
-import com.example.cpputest.CppUTestSetupHandler;
-import com.example.cpputest.TestRunnerGenerator;
-import com.example.cpputest.parser.TestScanner;
+import com.cpputest.manager.CppUTestSetupHandler;
+import com.cpputest.manager.TestRunnerGenerator;
+import com.cpputest.manager.parser.TestScanner;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -110,7 +110,7 @@ public class TestResultView extends ViewPart {
 
         // 列の設定（1列目：Name）
         TreeViewerColumn colName = new TreeViewerColumn(m_treeViewer, SWT.NONE);
-        colName.getColumn().setWidth(300);
+        colName.getColumn().setWidth(200);
         colName.getColumn().setText("Test Group / Name");
         colName.setLabelProvider(new ColumnLabelProvider() {
             @Override
@@ -207,21 +207,20 @@ public class TestResultView extends ViewPart {
         if (element instanceof TestGroup) {
             TestGroup group = (TestGroup) element;
             // 1つでも失敗があるか
-            boolean anyFailure = group.getCases().stream().anyMatch(tc -> !tc.success);
+            boolean anyFailure = group.getCases().stream().anyMatch(tc -> tc.tested && !tc.success);
             // 全件成功しているか（実行済みかつ失敗なし）
-            long successCount = group.getCases().stream().filter(tc -> tc.success).count();
-            long testedCount = group.getCases().stream().filter(tc -> tc.tested).count();
+            long successCount = group.getCases().stream().filter(tc -> tc.tested && tc.success).count();
             boolean allSuccess = (successCount == group.getCases().size() && successCount > 0);
 
-            if (testedCount == 0) {
-                // 1つも実行していない場合
-                return null;
-            } else if (anyFailure) {
+            if (anyFailure) {
                 // 実行済みかつ失敗あり
                 return Display.getDefault().getSystemColor(SWT.COLOR_RED);
             } else if (allSuccess) {
                 // 実行済みかつ全部成功
                 return Display.getDefault().getSystemColor(SWT.COLOR_GREEN);
+            } else {
+                // 実行していないものがある場合
+                return null;
             }
         } else if (element instanceof TestCase) {
             TestCase tc = (TestCase) element;
@@ -259,7 +258,7 @@ public class TestResultView extends ViewPart {
 
     // ツールバーを作成
     private void createToolbar() {
-        // main生成ボタンのアクション
+        // CppUtestRun.cppを生成ボタンのアクション
         org.eclipse.jface.action.Action generateAction = new org.eclipse.jface.action.Action("Generate") {
             @Override
             public void run() {
@@ -271,15 +270,12 @@ public class TestResultView extends ViewPart {
                         "プロジェクト '" + projectName + "' に CppUTest のmain関数ファイルの生成を行いますか？");
 
                 if (confirm) {
-                    // チェックされている項目を取得
-                    Object[] checkedElements = m_treeViewer.getCheckedElements();
-                    // mainファイルを生成
-                    TestRunnerGenerator.generateMain(projectName, checkedElements, m_testGroups);
+                    generateCppUTestRun(projectName);
                 }
             }
         };
 
-        // 初期設定ボタンのアクション
+        // CppUTest用の設定ボタンのアクション
         org.eclipse.jface.action.Action setupAction = new org.eclipse.jface.action.Action("Setting") {
             @Override
             public void run() {
@@ -293,6 +289,7 @@ public class TestResultView extends ViewPart {
                     try {
                         IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
                         CppUTestSetupHandler.applyCppUTestSetting(project);
+                        generateCppUTestRun(projectName);
                         MessageDialog.openInformation(getViewSite().getShell(), "Success", "CppUTest の初期設定が完了しました。");
                     } catch (Exception e) {
                         MessageDialog.openError(getViewSite().getShell(), "Error", "CppUTest の初期設定に失敗しました: " + e.getMessage());
@@ -320,9 +317,9 @@ public class TestResultView extends ViewPart {
         generateAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.jdt.ui", "icons/full/eview16/source.png"));
           
-        scanProjectAction.setToolTipText("プロジェクトのスキャンを行う");
-        setupAction.setToolTipText("CppUTest用の設定を行う");
-        generateAction.setToolTipText("現在のチェック状態のgenerated_main.cppを生成する");
+        scanProjectAction.setToolTipText("プロジェクトのスキャン");
+        setupAction.setToolTipText("CppUTest用の設定");
+        generateAction.setToolTipText("CppUtestRun.cppを生成");
         
         // ビューのツールバーにボタンを追加
         bars = getViewSite().getActionBars();
@@ -352,6 +349,12 @@ public class TestResultView extends ViewPart {
     }
     
 
+    private void generateCppUTestRun(String projectName) {
+        // チェックされている項目を取得
+        Object[] checkedElements = m_treeViewer.getCheckedElements();
+        // CppUtestRunファイルを生成
+        TestRunnerGenerator.generateCppUTestRun(projectName, checkedElements, m_testGroups);
+    }
 
     @Override
     public void setFocus() {

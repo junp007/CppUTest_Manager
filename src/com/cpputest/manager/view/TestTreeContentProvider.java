@@ -1,9 +1,9 @@
-package com.example.cpputest.view;
+package com.cpputest.manager.view;
 
 import org.eclipse.jface.viewers.ITreeContentProvider;
 
-import com.example.cpputest.view.TestResultView.TestCase;
-import com.example.cpputest.view.TestResultView.TestGroup;
+import com.cpputest.manager.view.TestResultView.TestCase;
+import com.cpputest.manager.view.TestResultView.TestGroup;
 
 import java.util.List;
 

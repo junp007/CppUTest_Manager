@@ -1,11 +1,11 @@
-package com.example.cpputest;
+package com.cpputest.manager;
 
 import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IViewReference;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.PlatformUI;
 
-import com.example.cpputest.view.TestResultView;
+import com.cpputest.manager.view.TestResultView;
 
 import java.util.HashMap;
 

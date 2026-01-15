@@ -1,4 +1,4 @@
-package com.example.cpputest;
+package com.cpputest.manager;
 
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugPlugin;
