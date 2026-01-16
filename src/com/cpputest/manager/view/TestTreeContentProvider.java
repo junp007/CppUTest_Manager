@@ -2,21 +2,21 @@ package com.cpputest.manager.view;
 
 import org.eclipse.jface.viewers.ITreeContentProvider;
 
-import com.cpputest.manager.view.TestResultView.TestCase;
-import com.cpputest.manager.view.TestResultView.TestGroup;
-import com.cpputest.manager.view.TestResultView.TestProject;
+import com.cpputest.manager.model.TestCase;
+import com.cpputest.manager.model.TestGroup;
+import com.cpputest.manager.model.TestProjectManager;
 
 public class TestTreeContentProvider implements ITreeContentProvider {
     @Override
     public Object[] getElements(Object inputElement) {
         // ルート要素としてグループの一覧を返す
-        return ((TestProject)inputElement).getTestGroups().toArray();
+        return ((TestProjectManager)inputElement).getTestGroups().toArray();
     }
 
     @Override
     public Object[] getChildren(Object parentElement) {
         if (parentElement instanceof TestGroup) {
-            return ((TestGroup) parentElement).cases.toArray();
+            return ((TestGroup) parentElement).getCases().toArray();
         }
         return null;
     }
@@ -31,6 +31,6 @@ public class TestTreeContentProvider implements ITreeContentProvider {
 
     @Override
     public boolean hasChildren(Object element) {
-        return element instanceof TestGroup && !((TestGroup) element).cases.isEmpty();
+        return element instanceof TestGroup && !((TestGroup) element).getCases().isEmpty();
     }
 }

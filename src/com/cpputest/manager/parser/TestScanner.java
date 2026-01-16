@@ -15,9 +15,8 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.jobs.Job;
 
+import com.cpputest.manager.model.TestProjectManager;
 import com.cpputest.manager.view.TestResultView;
-import com.cpputest.manager.view.TestResultView.TestGroup;
-import com.cpputest.manager.view.TestResultView.TestProject;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -29,7 +28,7 @@ public class TestScanner {
     private static final Pattern TEST_PATTERN = 
         Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
 
-    public static void scanProjectTestCase(String projectName, TestProject testProject) {
+    public static void scanProjectTestCase(String projectName, TestProjectManager testProjectManager) {
      // Jobの作成
         Job job = new Job("Scanning CppUTest cases in " + projectName) {
             @Override
@@ -39,6 +38,9 @@ public class TestScanner {
                     return Status.OK_STATUS;
                 }
         
+                // テストグループ、テストケースの存在フラグをクリアする
+                testProjectManager.clearCurrentProjectExistFlag();
+                
                 try {
                  // 全体的なファイル数を把握するのは難しいため、不確定な進捗として開始
                     monitor.beginTask("Reading files...", IProgressMonitor.UNKNOWN);
@@ -53,7 +55,7 @@ public class TestScanner {
                                 String name = proxy.getName();
                                 if (name.endsWith(".cpp")) {
                                     monitor.subTask("Analyzing: " + name);
-                                    parseFile((IFile) proxy.requestResource(), testProject);
+                                    parseFile((IFile) proxy.requestResource(), testProjectManager);
                                 }
                             }
                             return true; // 子リソースも探索
@@ -65,6 +67,9 @@ public class TestScanner {
                     monitor.done();
                 }
 
+             // テストグループ、テストケースの存在フラグが経っていないものを削除する
+                testProjectManager.removeNonExistElement();
+                
                 return Status.OK_STATUS;
             }
         };
@@ -74,7 +79,7 @@ public class TestScanner {
         job.schedule(); // 実行キューに入れる
     }
 
-    private static void parseFile(IFile file, TestProject testProject) {
+    private static void parseFile(IFile file, TestProjectManager testProjectManager) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getContents()))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -83,7 +88,7 @@ public class TestScanner {
                     String group = matcher.group(1);
                     String name = matcher.group(2);
                     // ビューに未完了状態で追加
-                    testProject.updateTestResult(group, name, false, false);
+                    testProjectManager.updateTestResult(group, name, false, false);
                 }
             }
         } catch (Exception e) {

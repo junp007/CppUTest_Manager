@@ -14,9 +14,9 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Path;
 
-import com.cpputest.manager.view.TestResultView.TestCase;
-import com.cpputest.manager.view.TestResultView.TestGroup;
-import com.cpputest.manager.view.TestResultView.TestProject;
+import com.cpputest.manager.model.TestCase;
+import com.cpputest.manager.model.TestGroup;
+import com.cpputest.manager.model.TestProject;
 
 public class TestRunnerGenerator {
 
@@ -60,12 +60,12 @@ public class TestRunnerGenerator {
 
                 // 「グループ全選択」か「個別選択」かを判定
                 if (selectedInGroup.size() == gp.getCases().size()) {
-                    // 全件選択なら -g
-                    sb.append("\n        , \"-g\", \"").append(gp.getName()).append("\"");
+                    // グループ全選択なら -sg
+                    sb.append("\n        , \"-sg\", \"").append(gp.getName()).append("\"");
                 } else {
                     // 一部なら -st
                     for (TestCase tc : selectedInGroup) {
-                        sb.append("\n        , \"-st\", \"").append(tc.getFullName()).append("\"");
+                        sb.append("\n        , \"-st\", \"").append(gp.getName() + "." + tc.getName()).append("\"");
                     }
                 }
             }
