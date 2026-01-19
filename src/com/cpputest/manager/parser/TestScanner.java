@@ -37,7 +37,7 @@ public class TestScanner {
                 if (!project.exists() || !project.isOpen()) {
                     return Status.OK_STATUS;
                 }
-        
+
                 // テストグループ、テストケースの存在フラグをクリアする
                 testProjectManager.clearCurrentProjectExistFlag();
                 
@@ -62,13 +62,13 @@ public class TestScanner {
                         }
                     }, IResource.NONE);
                 } catch (CoreException e) {
-                    return new Status(IStatus.ERROR, "com.example.cpputest", "Scan failed", e);
+                    return new Status(IStatus.ERROR, "com.cpputest.manager", "Scan failed", e);
                 } finally {
                     monitor.done();
                 }
 
-             // テストグループ、テストケースの存在フラグが経っていないものを削除する
-                testProjectManager.removeNonExistElement();
+                // テストグループ、テストケースの存在フラグが経っていないものを削除する
+                testProjectManager.removeNonExistTest();
                 
                 return Status.OK_STATUS;
             }

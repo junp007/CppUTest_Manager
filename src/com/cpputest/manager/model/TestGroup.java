@@ -68,7 +68,7 @@ public class TestGroup {
         m_exist = isExist;
     }
 
-    public void clearElementsExistFlag() {
+    public void clearTestCaseExistFlag() {
         m_cases.forEach(tc -> {
             tc.setExist(false);
         });

@@ -32,14 +32,19 @@ public class TestProject implements Iterable<TestGroup> {
         m_testGroups.clear();
     }
     
-    public void clearElementsExistFlag() {
+    public void clearExistFlag() {
         getTestGroups().forEach(tg -> {
             tg.setExist(false);
-            tg.clearElementsExistFlag();
+            tg.clearTestCaseExistFlag();
         });
     }
     
-    public void removeNonExistTestGroup() {
+    public void removeNonExistTest() {
+        // 各グループの存在しないテストケースを削除
+        m_testGroups.forEach(tg -> {
+            tg.removeNonExistTestCase();
+        });
+        // 存在しないグループを削除
         m_testGroups.removeIf(tg -> !tg.isExist());
     }
 }
