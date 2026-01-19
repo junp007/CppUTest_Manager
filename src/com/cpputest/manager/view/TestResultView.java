@@ -69,9 +69,22 @@ public class TestResultView extends ViewPart {
         // 2. ツールバーの作成
         createToolbar();
         
+        // プロジェクト変更時のリスナーの登録
         settingSelectionListener();
         
-        
+        // projectManagerのリスナーの登録
+        settingProjectManagerListener();
+    }
+    
+    @Override
+    public void dispose() {
+        if (selectionListener != null) {
+            getSite().getWorkbenchWindow().getSelectionService().removeSelectionListener(selectionListener);
+        }
+        super.dispose();
+    }
+    
+    private void settingProjectManagerListener() {
         // テストケースのデータ更新イベントハンドラ
         m_projectManager.addChangeListener(() -> {
             // UIスレッドで実行する必要がある
@@ -83,14 +96,6 @@ public class TestResultView extends ViewPart {
                 }
             });
         });
-    }
-    
-    @Override
-    public void dispose() {
-        if (selectionListener != null) {
-            getSite().getWorkbenchWindow().getSelectionService().removeSelectionListener(selectionListener);
-        }
-        super.dispose();
     }
     
     // プロジェクトが変更されたときのリスナー
@@ -146,6 +151,7 @@ public class TestResultView extends ViewPart {
                 }
             }
         };
+        // デバッグ実行時のリスナー登録
         DebugPlugin.getDefault().addDebugEventListener(debugListener);
     }
     
@@ -434,11 +440,6 @@ public class TestResultView extends ViewPart {
         m_toolbars = getViewSite().getActionBars();
         IToolBarManager toolbarManager = m_toolbars.getToolBarManager();
         
-        // プロジェクト選択コンボボックスを最初に追加
-//        m_projComboContribution = new ProjectComboContribution("projectSelector", this);
-        
-        // プロジェクト選択コンボボックス
-//        toolbarManager.add(m_projComboContribution);
         toolbarManager.add(new ControlContribution("projectLabelId") {
             @Override
             protected Control createControl(Composite parent) {
@@ -473,10 +474,6 @@ public class TestResultView extends ViewPart {
         toolbarManager.add(generateAction);
         
         m_toolbars.updateActionBars();
-        
-//        if (getSelectedProjectName() != null) {
-//            scanProjectTestCase(getSelectedProjectName());
-//        }
     }
     
 
@@ -521,8 +518,4 @@ public class TestResultView extends ViewPart {
         
         TestScanner.scanProjectTestCase(projectName, m_projectManager);
     }
-
-//    public String getSelectedProjectName() {
-//        return m_projComboContribution.getSelectedProjectName();
-//    }
 }
