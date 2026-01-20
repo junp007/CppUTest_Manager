@@ -5,9 +5,9 @@ import java.util.List;
 
 public class TestGroup {
     // テストグループ名
-    String m_name;
+    private String m_name;
     // テストケースリスト
-    List<TestCase> m_cases = new ArrayList<>();
+    private List<TestCase> m_cases = new ArrayList<>();
     // 展開されているかどうか
     private boolean m_expand;
     private boolean m_exist;
@@ -76,5 +76,11 @@ public class TestGroup {
     
     public void removeNonExistTestCase() {
         m_cases.removeIf(tc -> !tc.isExist());
+    }
+    
+    public void clearTestedFlag() {
+        m_cases.forEach(tc -> {
+            tc.setTested(false);
+        });
     }
 }

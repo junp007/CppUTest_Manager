@@ -51,4 +51,10 @@ public class TestProject implements Iterable<TestGroup> {
     public boolean isEmpty() {
         return m_testGroups.isEmpty();
     }
+    
+    public void clearTestedFlag() {
+        getTestGroups().forEach(tg -> {
+            tg.clearTestedFlag();
+        });
+    }
 }

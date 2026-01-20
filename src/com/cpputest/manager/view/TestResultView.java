@@ -192,8 +192,9 @@ public class TestResultView extends ViewPart {
         // プロジェクト名表示のラベルを更新
         if (m_projectLabel != null && !m_projectLabel.isDisposed()) {
             m_projectLabel.setText("Project: " + newProjectName);
-            // 文字列の長さに合わせてツールバーの幅を再計算させる（重要）
+            // 文字列の長さに合わせてツールバーの幅を再計算させる
             m_projectLabel.getParent().layout(true);
+            m_toolbars.updateActionBars();
         }
     }
     
@@ -427,11 +428,19 @@ public class TestResultView extends ViewPart {
         org.eclipse.jface.action.Action scanProjectAction = new org.eclipse.jface.action.Action("Scan") {
             @Override
             public void run() {
-                m_toolbars.updateActionBars();
                 scanProjectTestCase(m_projectManager.getCurrentProjectName());
+                m_toolbars.updateActionBars();
             }
         };
-
+        
+        // テスト結果削除ボタンのアクション
+        org.eclipse.jface.action.Action clearResultAllAction = new org.eclipse.jface.action.Action("ClearAll") {
+            @Override
+            public void run() {
+                m_projectManager.clearCurrentProjectTestedFlag();
+            }
+        };
+        
         // アイコンの設定
 //        setupAction.setImageDescriptor(org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().
 //                getImageDescriptor(org.eclipse.ui.ISharedImages.IMG_ETOOL_HOME_NAV));
@@ -441,10 +450,13 @@ public class TestResultView extends ViewPart {
                 "org.eclipse.ui", "icons/full/etool16/tricks.png"));
         generateAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.jdt.ui", "icons/full/eview16/source.png"));
+        clearResultAllAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
+                "org.eclipse.ui", "icons/full/etool16/clear.png"));
           
         scanProjectAction.setToolTipText("プロジェクトのスキャン");
         setupAction.setToolTipText("CppUTest用の設定");
         generateAction.setToolTipText("CppUtestRun.cppを生成");
+        clearResultAllAction.setToolTipText("テスト結果をクリア");
         
         // ビューのツールバーにボタンを追加
         m_toolbars = getViewSite().getActionBars();
@@ -472,12 +484,14 @@ public class TestResultView extends ViewPart {
                 return container;
             }
         });
-        // Scanボタン
-        toolbarManager.add(scanProjectAction);
-        // セパレーター（区切り線）
-        toolbarManager.add(new Separator());
         // CppUTestセットアップボタン
         toolbarManager.add(setupAction);
+        // セパレーター（区切り線）
+        toolbarManager.add(new Separator());
+        // Scanボタン
+        toolbarManager.add(scanProjectAction);
+        // Clearボタン
+        toolbarManager.add(clearResultAllAction);
         // セパレーター（区切り線）
         toolbarManager.add(new Separator());
         // Generateボタン

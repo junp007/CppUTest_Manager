@@ -98,7 +98,7 @@ public class TestProjectManager implements Iterable<TestGroup> {
         
         // 該当するグループを探す
         TestGroup group = groups.stream()
-                    .filter(g -> g.m_name.equals(groupName))
+                    .filter(g -> g.getName().equals(groupName))
                     .findFirst().orElse(null);
 
 
@@ -111,8 +111,8 @@ public class TestProjectManager implements Iterable<TestGroup> {
         group.setExist(true);
         
         // テストケースを探す
-        TestCase target = group.m_cases.stream()
-                .filter(tc -> tc.m_name.equals(testName))
+        TestCase target = group.getCases().stream()
+                .filter(tc -> tc.getName().equals(testName))
                 .findFirst().orElse(null);
         
         if (target == null) {
@@ -124,8 +124,8 @@ public class TestProjectManager implements Iterable<TestGroup> {
         target.setExist(true);
         // テスト済みとして登録する場合は引数の値を設定する
         if (isTested) {
-            target.m_success = isSuccess;
-            target.m_tested = isTested;
+            target.setSuccess(isSuccess);
+            target.setTested(isTested);
         }
         
         notifyChanged();
@@ -136,8 +136,15 @@ public class TestProjectManager implements Iterable<TestGroup> {
         m_currentProject.clearExistFlag();
     }
     
+    // 現在のプロジェクトで存在フラグがfalseのテストケースを削除する
     public void removeNonExistTest() {
         m_currentProject.removeNonExistTest();
+        notifyChanged();
+    }
+    
+    // 現在のプロジェクトのテスト済みフラグを全部falseにする
+    public void clearCurrentProjectTestedFlag() {
+        m_currentProject.clearTestedFlag();
         notifyChanged();
     }
 }
