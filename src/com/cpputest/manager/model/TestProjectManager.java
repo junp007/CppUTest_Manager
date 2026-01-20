@@ -57,13 +57,17 @@ public class TestProjectManager implements Iterable<TestGroup> {
     }
     
     public List<TestGroup> getTestGroups() {
-        // テスト結果ではない場合は表示中のプロジェクトを取得する
+        // 表示中のプロジェクトを取得する
         return m_currentProject.getTestGroups();
     }
     
     public List<TestGroup> getDebuggingTestGroups() {
         // デバッグ中のプロジェクトを取得する
         return ((TestProject)m_testProjectMap.get(m_currentDebuggingProjectName)).getTestGroups();
+    }
+    
+    public void changeProject(String newProjectName) {
+        changeProject(getCurrentProjectName(), newProjectName);
     }
     
     public void changeProject(String oldProjectName, String newProjectName) {

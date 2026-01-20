@@ -113,7 +113,7 @@ public class TestResultView extends ViewPart {
                 }
             }
             
-            if (project != null) {
+            if (project != null && project.getName() != m_projectManager.getCurrentProjectName()) {
                 // 表示するプロジェクトを切り替えてリフレッシュ
                 System.out.println("Selected Project: " + project.getName());
                 updateProjectDisplay(project);
@@ -138,13 +138,15 @@ public class TestResultView extends ViewPart {
                             
                             // プロジェクトを特定
                             IProject project = getProjectFromLaunch(launch);
-                            // デバッグ中のプロジェクト名を設定
-                            m_projectManager.setCurrentDebuggingProjectName(project.getName());
                             if (project != null) {
-                                // 3. UIスレッドに切り替えて表示を更新
-                                Display.getDefault().asyncExec(() -> {
-                                    updateProjectDisplay(project);
-                                });
+                                // デバッグ中のプロジェクト名を設定
+                                m_projectManager.setCurrentDebuggingProjectName(project.getName());
+                                if (project.getName() != m_projectManager.getCurrentProjectName()) {
+                                    // プロジェクト名が変わっていればUIスレッドに切り替えて表示を更新
+                                    Display.getDefault().asyncExec(() -> {
+                                        updateProjectDisplay(project);
+                                    });
+                                }
                             }
                         }
                     }
@@ -171,13 +173,21 @@ public class TestResultView extends ViewPart {
         return null;
     }
     
+    // プロジェクトの表示更新
     private void updateProjectDisplay(IProject project) {
         if (project == null) {
             // Do nothing if project is null.
             return;
         }
         String newProjectName = project.getName();
-        changeProject(m_projectManager.getCurrentProjectName(), newProjectName);
+
+        // プロジェクトの変更
+        m_projectManager.changeProject(newProjectName);
+        
+        if (m_projectManager.getCurrentProject().isEmpty()) {
+            // 変更後のプロジェクトが空のプロジェクトならテストケースのスキャンを行う
+            scanProjectTestCase(newProjectName);
+        }
         
         // プロジェクト名表示のラベルを更新
         if (m_projectLabel != null && !m_projectLabel.isDisposed()) {
@@ -516,6 +526,7 @@ public class TestResultView extends ViewPart {
     public void scanProjectTestCase(String projectName) {
         if (projectName == null) return; // プロジェクト未選択なら何もしない
         
+        System.out.println("Scan Project: " + projectName);
         TestScanner.scanProjectTestCase(projectName, m_projectManager);
     }
 }

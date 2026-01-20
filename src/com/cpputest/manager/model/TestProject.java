@@ -47,4 +47,8 @@ public class TestProject implements Iterable<TestGroup> {
         // 存在しないグループを削除
         m_testGroups.removeIf(tg -> !tg.isExist());
     }
+    
+    public boolean isEmpty() {
+        return m_testGroups.isEmpty();
+    }
 }
