@@ -51,6 +51,7 @@ public class TestRunnerGenerator {
             sb.append("    const char* args[] = {\"test\", \"-v\"");
 
             // 引数の生成処理
+            /*
             for (TestGroup gp : testProject) {
                 // そのグループ内の「チェックされているテスト」を抽出
                 List<TestCase> selectedInGroup = gp.getCases().stream().filter(tc -> checkedSet.contains(tc)).collect(Collectors.toList());
@@ -67,6 +68,27 @@ public class TestRunnerGenerator {
                     for (TestCase tc : selectedInGroup) {
                         sb.append("\n        , \"-st\", \"").append(gp.getName() + "." + tc.getName()).append("\"");
                     }
+                }
+            }
+            */
+            
+            int allTestCaseCount = 0;
+            for (TestGroup testGroup : testProject) {
+                allTestCaseCount += testGroup.getCases().size();
+            }
+            
+            // チェックされているテスト数が半分より多ければ無視するテストケースを指定する。そうでなければ実行するテストケースを指定する
+            //boolean specifyIgnoreCase = checkedElements.length > allTestCaseCount / 2;
+            // としようとしたけど、-xstはグループ or テストケース名のどちらかが合致していれば無視するというバグ(?)があるので-stだけで指定することにする
+
+            for (TestGroup testGroup : testProject) {
+                List<TestCase> selectedCases = testGroup.getCases().stream()
+                        .filter(tc -> checkedSet.contains(tc)).collect(Collectors.toList());
+                if (selectedCases.isEmpty()) {
+                    continue; // このグループにはない
+                }
+                for (TestCase tc : selectedCases) {
+                    sb.append(("\n        , \"-st\", \"") + testGroup.getName() + "." + tc.getName() + "\"");
                 }
             }
 
