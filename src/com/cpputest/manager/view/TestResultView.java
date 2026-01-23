@@ -239,7 +239,7 @@ public class TestResultView extends ViewPart {
                 if (element instanceof TestGroup) {
                     TestGroup group = (TestGroup) element;
                     // 成功数をカウント
-                    long successCount = group.getCases().stream().filter(tc -> tc.isSuccess()).count();
+                    long successCount = group.getCases().stream().filter(tc -> tc.isSuccess() && tc.isTested()).count();
                     int totalCount = group.getCases().size();
                     return String.format("(%d/%d)", successCount, totalCount);
                 }
