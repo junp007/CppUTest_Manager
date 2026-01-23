@@ -1,6 +1,5 @@
 package com.cpputest.manager.view;
 
-import org.eclipse.cdt.internal.core.model.CContainer;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
@@ -35,12 +34,9 @@ import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.ISelectionListener;
-import org.eclipse.ui.IWorkbenchPart;
-import org.eclipse.ui.IWorkbenchPartReference;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.eclipse.ui.IFileEditorInput;
-import org.eclipse.ui.IPartListener2;
 
 import com.cpputest.manager.CppUTestSetupHandler;
 import com.cpputest.manager.TestRunnerGenerator;
@@ -127,27 +123,24 @@ public class TestResultView extends ViewPart {
             @Override
             public void handleDebugEvents(DebugEvent[] events) {
                 for (DebugEvent event : events) {
-                    // 1. 新しい「作成(CREATE)」イベントかどうか
-                    if (event.getKind() == DebugEvent.CREATE) {
-                        Object source = event.getSource();
+                    // 新しい「作成(CREATE)」イベントかどうか かつ ソースが IProcess (実行プロセス) の場合
+                    if (event.getKind() == DebugEvent.CREATE && event.getSource() instanceof IProcess) {
+                        IProcess process = (IProcess) event.getSource();
+                        ILaunch launch = process.getLaunch();
                         
-                        // 2. ソースが IProcess (実行プロセス) の場合
-                        if (source instanceof IProcess) {
-                            IProcess process = (IProcess) source;
-                            ILaunch launch = process.getLaunch();
-                            
-                            // プロジェクトを特定
-                            IProject project = getProjectFromLaunch(launch);
-                            if (project != null) {
-                                // デバッグ中のプロジェクト名を設定
-                                m_projectManager.setCurrentDebuggingProjectName(project.getName());
-                                if (project.getName() != m_projectManager.getCurrentProjectName()) {
-                                    // プロジェクト名が変わっていればUIスレッドに切り替えて表示を更新
-                                    Display.getDefault().asyncExec(() -> {
-                                        updateProjectDisplay(project);
-                                    });
-                                }
-                            }
+                        // プロジェクトを特定
+                        IProject project = getProjectFromLaunch(launch);
+                        if (project == null) {
+                            // 無ければ無視
+                            continue;
+                        }
+                        // デバッグ中のプロジェクト名を設定
+                        m_projectManager.setCurrentDebuggingProjectName(project.getName());
+                        if (project.getName() != m_projectManager.getCurrentProjectName()) {
+                            // プロジェクト名が変わっていればUIスレッドに切り替えて表示を更新
+                            Display.getDefault().asyncExec(() -> {
+                                updateProjectDisplay(project);
+                            });
                         }
                     }
                 }
@@ -455,7 +448,7 @@ public class TestResultView extends ViewPart {
           
         scanProjectAction.setToolTipText("プロジェクトのスキャン");
         setupAction.setToolTipText("CppUTest用の設定");
-        generateAction.setToolTipText("CppUtestRun.cppを生成");
+        generateAction.setToolTipText("CppUTestRun.cppを生成");
         clearResultAllAction.setToolTipText("テスト結果をクリア");
         
         // ビューのツールバーにボタンを追加
