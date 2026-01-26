@@ -30,12 +30,14 @@ import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.text.IDocument;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
@@ -218,7 +220,7 @@ public class TestResultView extends ViewPart {
     // チェックボックス付きのテーブルビューアを作成
     private void createTreeViewer(Composite parent) {
      // TreeViewer の作成
-        m_treeViewer = new CheckboxTreeViewer(parent, SWT.BORDER | SWT.MULTI | SWT.CHECK);
+        m_treeViewer = new CheckboxTreeViewer(parent, SWT.BORDER | SWT.MULTI | SWT.CHECK | SWT.FULL_SELECTION);
         m_treeViewer.getTree().setHeaderVisible(true);
         m_treeViewer.getTree().setLinesVisible(true);
         m_treeViewer.getControl().setLayoutData(new GridData(GridData.FILL_BOTH));
@@ -332,6 +334,37 @@ public class TestResultView extends ViewPart {
                     group.setExpand(false);
                 }
             }
+        });
+        
+        m_treeViewer.getTree().addListener(SWT.EraseItem, event -> {
+            boolean isSelected = (event.detail & (SWT.SELECTED | SWT.HOT)) != 0;
+            if (!isSelected) return; // 選択されていないなら何もしない
+
+            // 標準の選択色をキャンセル
+            event.detail &= ~SWT.SELECTED;
+
+            TreeItem item = (TreeItem) event.item;
+            Color itemBackground = item.getBackground(event.index);
+            GC gc = event.gc;
+            // 描画後に復元するために現在値を保存しておく
+            Color oldBackground = gc.getBackground();
+            int oldAlpha = gc.getAlpha();
+            // 背景描画
+            if (itemBackground != null) {
+                gc.setBackground(itemBackground);
+            } else {
+                gc.setBackground(((Control)event.widget).getBackground());
+            }
+            gc.fillRectangle(event.x, event.y, event.width, event.height);
+
+            // 選択状態を暗く表示するため、半透明の黒を描く
+            gc.setAlpha(40);
+            gc.setBackground(Display.getDefault().getSystemColor(SWT.COLOR_BLACK));
+            gc.fillRectangle(event.x, event.y, event.width, event.height);
+            
+            // 背景、不透明度の復元
+            gc.setBackground(oldBackground);
+            gc.setAlpha(oldAlpha);
         });
         
         m_treeViewer.addDoubleClickListener(new IDoubleClickListener() {
