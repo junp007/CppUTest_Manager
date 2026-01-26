@@ -30,12 +30,16 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.ide.IDE;
 import org.eclipse.ui.texteditor.ITextEditor;
 
+import com.cpputest.manager.model.ICheckable;
 import com.cpputest.manager.model.TestCase;
 import com.cpputest.manager.model.TestGroup;
 import com.cpputest.manager.model.TestGroup.CheckState;
 import com.cpputest.manager.model.TestProjectManager;
 
 public class TestTreeViewer extends CheckboxTreeViewer {
+    // 選択行の色の濃さ
+    private static final int SELECTION_ALPHA = 40;
+    
     public TestTreeViewer(Composite parent, TestProjectManager projectManger) {
         super(parent, SWT.BORDER | SWT.MULTI | SWT.CHECK | SWT.FULL_SELECTION);
         init(projectManger);
@@ -53,8 +57,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         colName.setLabelProvider(new ColumnLabelProvider() {
             @Override
             public String getText(Object element) {
-                if (element instanceof TestGroup) return ((TestGroup) element).getName();
-                if (element instanceof TestCase) return ((TestCase) element).getName();
+                if (element instanceof ICheckable) return ((ICheckable) element).getName();
                 return "";
             }
             @Override
@@ -72,10 +75,8 @@ public class TestTreeViewer extends CheckboxTreeViewer {
             public String getText(Object element) {
                 if (element instanceof TestGroup) {
                     TestGroup group = (TestGroup) element;
-                    // 成功数をカウント
-                    long successCount = group.getCases().stream().filter(tc -> tc.isSuccess() && tc.isTested()).count();
-                    int totalCount = group.getCases().size();
-                    return String.format("(%d/%d)", successCount, totalCount);
+                    // (成功数/総数)を表示
+                    return String.format("(%d/%d)", group.getSuccessCount(), group.getTotalCount());
                 }
                 if (element instanceof TestCase) {
                     TestCase tc = (TestCase)element;
@@ -98,13 +99,8 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         this.setCheckStateProvider(new ICheckStateProvider() {
             @Override
             public boolean isChecked(Object element) {
-                if (element instanceof TestCase) {
-                    return ((TestCase) element).isChecked();
-                } else if (element instanceof TestGroup) {
-                    CheckState state = ((TestGroup) element).getCheckState();
-                    // グループ内のテストケースが1つ以上チェックされていればisCheckはtrueを返すようにする。
-                    // (グレーチェックはisCheckedがtrueかつisGrayedがtrueのときになるので全チェック以外もtrueを返す)
-                    return state == CheckState.AllChecked || state == CheckState.PartChecked;
+                if (element instanceof ICheckable) {
+                    return ((ICheckable) element).isChecked();
                 }
                 return false;
             }
@@ -125,10 +121,8 @@ public class TestTreeViewer extends CheckboxTreeViewer {
             Object element = event.getElement();
             boolean checked = event.getChecked();
 
-            if (element instanceof TestGroup) {
-                ((TestGroup)element).setChecked(checked);
-            } else if (element instanceof TestCase) {
-                ((TestCase)element).setChecked(checked);
+            if (element instanceof ICheckable) {
+                ((ICheckable)element).setChecked(checked);
             }
             // チェック状態が変わったのでリフレッシュ
             CheckboxTreeViewer treeViewer = (CheckboxTreeViewer)event.getSource();
@@ -179,7 +173,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
             gc.fillRectangle(event.x, event.y, event.width, event.height);
 
             // 選択状態を暗く表示するため、半透明の黒を描く
-            gc.setAlpha(40);
+            gc.setAlpha(SELECTION_ALPHA);
             gc.setBackground(Display.getDefault().getSystemColor(SWT.COLOR_BLACK));
             gc.fillRectangle(event.x, event.y, event.width, event.height);
             

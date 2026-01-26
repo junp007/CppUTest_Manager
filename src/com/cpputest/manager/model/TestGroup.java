@@ -3,7 +3,7 @@ package com.cpputest.manager.model;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TestGroup {
+public class TestGroup implements ICheckable {
     // テストグループ名
     private String m_name;
     // テストケースリスト
@@ -34,6 +34,11 @@ public class TestGroup {
     // グループ配下のテストケースすべてのチェック状態を設定する
     public void setChecked(boolean checked) {
         m_cases.stream().forEach(tc -> tc.setChecked(checked));
+    }
+    
+    public boolean isChecked() {
+        // 1つでもチェックされていたらtrueを返す
+        return m_cases.stream().anyMatch(TestCase::isChecked);
     }
     
     public enum CheckState {NonChecked, PartChecked, AllChecked};
@@ -82,5 +87,15 @@ public class TestGroup {
         m_cases.forEach(tc -> {
             tc.setTested(false);
         });
+    }
+    
+    // グループ内のテストケースの成功数を取得
+    public int getSuccessCount() {
+        return (int)getCases().stream().filter(tc -> tc.isSuccess() && tc.isTested()).count();
+    }
+    
+    // グループ内のテストケースの総数を取得
+    public int getTotalCount() {
+        return getCases().size();
     }
 }

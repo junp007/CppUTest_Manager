@@ -1,7 +1,7 @@
 package com.cpputest.manager.model;
 
 // テストケースのデータを保持する簡単な内部クラス
-public class TestCase {
+public class TestCase implements ICheckable {
     // テスト名
     private String m_name;
     // テスト結果が成功かどうか

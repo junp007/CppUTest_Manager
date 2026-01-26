@@ -87,8 +87,8 @@ public class TestResultView extends ViewPart {
         });
     }
     
-    // プロジェクトが変更されたときのリスナー
     private void settingSelectionListener() {
+        // プロジェクトが変更されたときのリスナー
         selectionListener = (part, selection) -> {
             if (part == TestResultView.this) return;
             
@@ -108,7 +108,7 @@ public class TestResultView extends ViewPart {
                 updateProjectDisplay(project);
             }
         };
-         // リスナー登録
+         // プロジェクトが変更されたときのリスナー登録
         getSite().getWorkbenchWindow().getSelectionService().addSelectionListener(selectionListener);
         
         
