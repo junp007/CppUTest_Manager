@@ -82,14 +82,17 @@ public class TestScanner {
     private static void parseFile(IFile file, TestProjectManager testProjectManager) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getContents()))) {
             String line;
+            // 行番号を数える変数(最初の行を1とする)
+            int lineNum = 1;
             while ((line = reader.readLine()) != null) {
                 Matcher matcher = TEST_PATTERN.matcher(line);
                 while (matcher.find()) {
                     String group = matcher.group(1);
                     String name = matcher.group(2);
                     // ビューに未完了状態で追加
-                    testProjectManager.updateTestResult(group, name, false, false);
+                    testProjectManager.updateTestResult(group, name, false, false, file.getFullPath().toString(), lineNum);
                 }
+                ++lineNum;
             }
         } catch (Exception e) {
             e.printStackTrace();

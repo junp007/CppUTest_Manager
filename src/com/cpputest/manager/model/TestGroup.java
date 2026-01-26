@@ -13,9 +13,9 @@ public class TestGroup {
     private boolean m_exist;
     
     public TestGroup(String name) {
-        this.m_name = name;
-        this.m_expand = true;
-        this.m_exist = false;
+        m_name = name;
+        m_expand = true;
+        m_exist = false;
     }
     
     public String getName() {

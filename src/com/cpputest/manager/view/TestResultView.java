@@ -1,9 +1,12 @@
 package com.cpputest.manager.view;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.IDebugEventSetListener;
@@ -13,7 +16,9 @@ import org.eclipse.debug.core.model.IProcess;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
+import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.ICheckStateProvider;
+import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeViewerListener;
@@ -22,6 +27,7 @@ import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.action.ControlContribution;
 import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.jface.text.IDocument;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.layout.GridData;
@@ -34,8 +40,13 @@ import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.ISelectionListener;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchWindow;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.ide.IDE;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
+import org.eclipse.ui.texteditor.ITextEditor;
 import org.eclipse.ui.IFileEditorInput;
 
 import com.cpputest.manager.CppUTestSetupHandler;
@@ -322,7 +333,23 @@ public class TestResultView extends ViewPart {
                 }
             }
         });
+        
+        m_treeViewer.addDoubleClickListener(new IDoubleClickListener() {
+            @Override
+            public void doubleClick(DoubleClickEvent event) {
+                // 選択された要素を取得
+                IStructuredSelection selection = (IStructuredSelection) event.getSelection();
+                Object firstElement = selection.getFirstElement();
+
+                if (firstElement instanceof TestCase) {
+                    TestCase tc = (TestCase) firstElement;
+                    // エディタを開く処理を呼び出す
+                    openEditorAtLine(tc.getFileName(), tc.getLineNumber());
+                }
+            }
+        });
     
+        // ツリーに表示するデータとしてm_projectManagerをセットする
         m_treeViewer.setInput(m_projectManager);
     }
     
@@ -513,7 +540,7 @@ public class TestResultView extends ViewPart {
     }
 
     public static void updateTestResult(final String groupName, final String testName, final boolean isSuccess, final boolean isTested) {
-        m_instance.m_projectManager.updateTestResult(groupName, testName, isSuccess, isTested);
+        m_instance.m_projectManager.updateTestResult(groupName, testName, isSuccess, isTested, "", 0);
     }
     
     // プロジェクトを変更、及び再スキャンするときに呼ばれる
@@ -530,10 +557,45 @@ public class TestResultView extends ViewPart {
         scanProjectTestCase(newProjectName);
     }
     
+    // テストケースをスキャンする
     public void scanProjectTestCase(String projectName) {
         if (projectName == null) return; // プロジェクト未選択なら何もしない
         
         System.out.println("Scan Project: " + projectName);
         TestScanner.scanProjectTestCase(projectName, m_projectManager);
+    }
+    
+    private void openEditorAtLine(String fileName, int lineNumber) {
+        if (fileName == null || fileName.isEmpty()) return;
+
+        // UIスレッドで実行
+        Display.getDefault().asyncExec(() -> {
+            try {
+                IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+                IWorkbenchPage page = window.getActivePage();
+
+                IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
+                IFile file = root.getFile(IPath.fromPortableString(fileName));
+                if (file.exists()) {
+                    // エディタを開く
+                    IEditorPart editor = IDE.openEditor(page, file, true);
+
+                    // 指定行へジャンプ (ITextEditorにキャスト)
+                    if (editor instanceof ITextEditor && lineNumber > 0) {
+                        ITextEditor textEditor = (ITextEditor) editor;
+                        IDocument document = textEditor.getDocumentProvider().getDocument(textEditor.getEditorInput());
+                        
+                        // 行番号からオフセット（文字数）に変換
+                        // documentの行は0始まりなので -1 する
+                        int offset = document.getLineInformation(lineNumber - 1).getOffset();
+                        
+                        // エディタ上で選択（ジャンプ）
+                        textEditor.selectAndReveal(offset, 0);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 }

@@ -86,7 +86,7 @@ public class TestProjectManager implements Iterable<TestGroup> {
         notifyChanged();
     }
     
-    public void updateTestResult(String groupName, String testName, boolean isSuccess, boolean isTested) {
+    public void updateTestResult(String groupName, String testName, boolean isSuccess, boolean isTested, String fileName, int lineNum) {
         List<TestGroup> groups;
         if (isTested) {
             // テスト結果を入れる場合はデバッグ中プロジェクトを使う
@@ -117,7 +117,7 @@ public class TestProjectManager implements Iterable<TestGroup> {
         
         if (target == null) {
             // テストケースが見つからない場合は新しいテストケースを作成
-            target = new TestCase(testName);
+            target = new TestCase(testName, fileName, lineNum);
             group.addTestCase(target);
         }
         // テストケースの存在フラグをtrueにする

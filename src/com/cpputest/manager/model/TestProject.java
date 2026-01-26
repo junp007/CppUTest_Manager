@@ -12,7 +12,7 @@ public class TestProject implements Iterable<TestGroup> {
     }
     
     public TestProject(TestProject other) {
-        this.m_testGroups = new ArrayList<TestGroup>(other.m_testGroups);
+        m_testGroups = new ArrayList<TestGroup>(other.m_testGroups);
     }
 
     @Override

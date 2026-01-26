@@ -14,21 +14,27 @@ public class TestCase {
     private TestGroup m_group;
     // 存在確認フラグ
     private boolean m_exist;
+    // ファイル名
+    private String m_fileName;
+    // 行番号(エディタの仕様に合わせて最初の行を1とする)
+    private int m_lineNumber;
 
-    public TestCase(String name) {
-      this.m_name = name;
-      this.m_success = false;
-      this.m_tested = false;
-      this.m_checked = true;
-      this.m_exist = false;
+    public TestCase(String name, String fileName, int lineNumber) {
+      m_name = name;
+      m_success = false;
+      m_tested = false;
+      m_checked = true;
+      m_exist = false;
+      m_fileName = fileName;
+      m_lineNumber = lineNumber;
     }
 
     public String getName() {
-        return this.m_name;
+        return m_name;
     }
     
     public void setChecked(boolean isChecked) {
-        this.m_checked = isChecked;
+        m_checked = isChecked;
     }
     
     public boolean isSuccess() {
@@ -65,5 +71,13 @@ public class TestCase {
     
     public void setExist(boolean isExist) {
         m_exist = isExist;
+    }
+    
+    public String getFileName() {
+        return m_fileName;
+    }
+    
+    public int getLineNumber() {
+        return m_lineNumber;
     }
 }

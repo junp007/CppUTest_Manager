@@ -17,7 +17,9 @@ Require-Bundle: org.eclipse.ui,
  org.eclipse.cdt.core;bundle-version="7.0.0",
  org.eclipse.cdt.managedbuilder.core;bundle-version="7.0.0",
  org.eclipse.jdt.ui;bundle-version="3.0.0",
- org.eclipse.ui.ide;bundle-version="3.0.0"
+ org.eclipse.ui.ide;bundle-version="3.0.0",
+ org.eclipse.ui.editors;bundle-version="3.0.0",
+ org.eclipse.ui.workbench.texteditor;bundle-version="3.0.0"
 Bundle-RequiredExecutionEnvironment: JavaSE-11
 Automatic-Module-Name: com.cpputest.manager
 Bundle-ActivationPolicy: lazy
