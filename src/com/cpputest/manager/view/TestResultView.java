@@ -1,12 +1,9 @@
 package com.cpputest.manager.view;
 
-import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
-import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IAdaptable;
-import org.eclipse.core.runtime.IPath;
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.IDebugEventSetListener;
@@ -14,41 +11,24 @@ import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.model.IProcess;
 import org.eclipse.jface.action.IToolBarManager;
-import org.eclipse.jface.viewers.CheckboxTreeViewer;
-import org.eclipse.jface.viewers.ColumnLabelProvider;
-import org.eclipse.jface.viewers.DoubleClickEvent;
-import org.eclipse.jface.viewers.ICheckStateProvider;
-import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.jface.viewers.ITreeViewerListener;
-import org.eclipse.jface.viewers.TreeExpansionEvent;
-import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.action.ControlContribution;
 import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.jface.text.IDocument;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.ISelectionListener;
-import org.eclipse.ui.IWorkbenchPage;
-import org.eclipse.ui.IWorkbenchWindow;
-import org.eclipse.ui.PlatformUI;
-import org.eclipse.ui.ide.IDE;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
-import org.eclipse.ui.texteditor.ITextEditor;
 import org.eclipse.ui.IFileEditorInput;
 
 import com.cpputest.manager.CppUTestSetupHandler;
@@ -63,7 +43,7 @@ import java.io.Console;
 
 public class TestResultView extends ViewPart {
 //    private ProjectComboContribution m_projComboContribution;
-    private CheckboxTreeViewer m_treeViewer;
+    private TestTreeViewer m_treeViewer;
     private TestProjectManager m_projectManager = new TestProjectManager();
     private IActionBars m_toolbars;
     private Label m_projectLabel;
@@ -74,7 +54,7 @@ public class TestResultView extends ViewPart {
     @Override
     public void createPartControl(Composite parent) {
         // 1. UIの作成
-        createTreeViewer(parent);
+        m_treeViewer = new TestTreeViewer(parent, m_projectManager);
         // 2. ツールバーの作成
         createToolbar();
         
@@ -216,218 +196,13 @@ public class TestResultView extends ViewPart {
         }
         return null;
     }
-    
-    // チェックボックス付きのテーブルビューアを作成
-    private void createTreeViewer(Composite parent) {
-     // TreeViewer の作成
-        m_treeViewer = new CheckboxTreeViewer(parent, SWT.BORDER | SWT.MULTI | SWT.CHECK | SWT.FULL_SELECTION);
-        m_treeViewer.getTree().setHeaderVisible(true);
-        m_treeViewer.getTree().setLinesVisible(true);
-        m_treeViewer.getControl().setLayoutData(new GridData(GridData.FILL_BOTH));
 
-        // 列の設定（1列目：Name）
-        TreeViewerColumn colName = new TreeViewerColumn(m_treeViewer, SWT.NONE);
-        colName.getColumn().setWidth(200);
-        colName.getColumn().setText("Test Group / Name");
-        colName.setLabelProvider(new ColumnLabelProvider() {
-            @Override
-            public String getText(Object element) {
-                if (element instanceof TestGroup) return ((TestGroup) element).getName();
-                if (element instanceof TestCase) return ((TestCase) element).getName();
-                return "";
-            }
-            @Override
-            public Color getBackground(Object element) {
-                return getStatusColor(element);
-            }
-        });
-
-        // 列の設定（2列目：Status）
-        TreeViewerColumn colStatus = new TreeViewerColumn(m_treeViewer, SWT.NONE);
-        colStatus.getColumn().setWidth(100);
-        colStatus.getColumn().setText("Status");
-        colStatus.setLabelProvider(new ColumnLabelProvider() {
-            @Override
-            public String getText(Object element) {
-                if (element instanceof TestGroup) {
-                    TestGroup group = (TestGroup) element;
-                    // 成功数をカウント
-                    long successCount = group.getCases().stream().filter(tc -> tc.isSuccess() && tc.isTested()).count();
-                    int totalCount = group.getCases().size();
-                    return String.format("(%d/%d)", successCount, totalCount);
-                }
-                if (element instanceof TestCase) {
-                    TestCase tc = (TestCase)element;
-                    if (tc.isTested()) {
-                        return tc.isSuccess() ? "Success" : "Failure";
-                    } else {
-                        return "Idle";
-                    }
-                }
-                return "";
-            }
-            
-            @Override
-            public Color getBackground(Object element) {
-                return getStatusColor(element);
-            }
-        });
-
-        m_treeViewer.setContentProvider(new TestTreeContentProvider());
-        m_treeViewer.setCheckStateProvider(new ICheckStateProvider() {
-            @Override
-            public boolean isChecked(Object element) {
-                if (element instanceof TestCase) {
-                    return ((TestCase) element).isChecked();
-                } else if (element instanceof TestGroup) {
-                    CheckState state = ((TestGroup) element).getCheckState();
-                    // グループ内のテストケースが1つ以上チェックされていればisCheckはtrueを返すようにする。
-                    // (グレーチェックはisCheckedがtrueかつisGrayedがtrueのときになるので全チェック以外もtrueを返す)
-                    return state == CheckState.AllChecked || state == CheckState.PartChecked;
-                }
-                return false;
-            }
-
-            @Override
-            public boolean isGrayed(Object element) {
-                if (element instanceof TestGroup) {
-                    CheckState state = ((TestGroup) element).getCheckState();
-                    return state == CheckState.PartChecked;
-                } else {
-                    return false;
-                }
-            }
-        });
-
-        // チェック状態が変更されたときに呼ばれる
-        m_treeViewer.addCheckStateListener(event -> {
-            Object element = event.getElement();
-            boolean checked = event.getChecked();
-
-            if (element instanceof TestGroup) {
-                ((TestGroup)element).setChecked(checked);
-            } else if (element instanceof TestCase) {
-                ((TestCase)element).setChecked(checked);
-            }
-            // チェック状態が変わったのでリフレッシュ
-            CheckboxTreeViewer treeViewer = (CheckboxTreeViewer)event.getSource();
-            treeViewer.refresh();
-        });
-        
-        m_treeViewer.addTreeListener(new ITreeViewerListener() {
-            @Override
-            public void treeExpanded(TreeExpansionEvent event) {
-                // グループが開かれた時の処理
-                Object element = event.getElement();
-                if (element instanceof TestGroup) {
-                    TestGroup group = (TestGroup) element;
-                    group.setExpand(true);
-                }
-            }
-
-            @Override
-            public void treeCollapsed(TreeExpansionEvent event) {
-                // グループが閉じられた時の処理
-                Object element = event.getElement();
-                if (element instanceof TestGroup) {
-                    TestGroup group = (TestGroup) element;
-                    group.setExpand(false);
-                }
-            }
-        });
-        
-        m_treeViewer.getTree().addListener(SWT.EraseItem, event -> {
-            boolean isSelected = (event.detail & (SWT.SELECTED | SWT.HOT)) != 0;
-            if (!isSelected) return; // 選択されていないなら何もしない
-
-            // 標準の選択色をキャンセル
-            event.detail &= ~SWT.SELECTED;
-
-            TreeItem item = (TreeItem) event.item;
-            Color itemBackground = item.getBackground(event.index);
-            GC gc = event.gc;
-            // 描画後に復元するために現在値を保存しておく
-            Color oldBackground = gc.getBackground();
-            int oldAlpha = gc.getAlpha();
-            // 背景描画
-            if (itemBackground != null) {
-                gc.setBackground(itemBackground);
-            } else {
-                gc.setBackground(((Control)event.widget).getBackground());
-            }
-            gc.fillRectangle(event.x, event.y, event.width, event.height);
-
-            // 選択状態を暗く表示するため、半透明の黒を描く
-            gc.setAlpha(40);
-            gc.setBackground(Display.getDefault().getSystemColor(SWT.COLOR_BLACK));
-            gc.fillRectangle(event.x, event.y, event.width, event.height);
-            
-            // 背景、不透明度の復元
-            gc.setBackground(oldBackground);
-            gc.setAlpha(oldAlpha);
-        });
-        
-        m_treeViewer.addDoubleClickListener(new IDoubleClickListener() {
-            @Override
-            public void doubleClick(DoubleClickEvent event) {
-                // 選択された要素を取得
-                IStructuredSelection selection = (IStructuredSelection) event.getSelection();
-                Object firstElement = selection.getFirstElement();
-
-                if (firstElement instanceof TestCase) {
-                    TestCase tc = (TestCase) firstElement;
-                    // エディタを開く処理を呼び出す
-                    openEditorAtLine(tc.getFileName(), tc.getLineNumber());
-                }
-            }
-        });
-    
-        // ツリーに表示するデータとしてm_projectManagerをセットする
-        m_treeViewer.setInput(m_projectManager);
-    }
-    
     private void syncExpandState() {
         // モデル（TestProjectなど）内の全グループをループ
         for (TestGroup group : m_projectManager.getTestGroups()) {
             // 第1引数に要素、第2引数に展開(true)/折り畳み(false)
             m_treeViewer.setExpandedState(group, group.isExpand());
         }
-    }
-    
-    // --- 背景色を決定する共通メソッド ---
-    private Color getStatusColor(Object element) {
-        if (element instanceof TestGroup) {
-            TestGroup group = (TestGroup) element;
-            // 1つでも失敗があるか
-            boolean anyFailure = group.getCases().stream().anyMatch(tc -> tc.isTested() && !tc.isSuccess());
-            // 全件成功しているか（実行済みかつ失敗なし）
-            long successCount = group.getCases().stream().filter(tc -> tc.isTested() && tc.isSuccess()).count();
-            boolean allSuccess = (successCount == group.getCases().size() && successCount > 0);
-
-            if (anyFailure) {
-                // 実行済みかつ失敗あり
-                return Display.getDefault().getSystemColor(SWT.COLOR_RED);
-            } else if (allSuccess) {
-                // 実行済みかつ全部成功
-                return Display.getDefault().getSystemColor(SWT.COLOR_GREEN);
-            } else {
-                // 実行していないものがある場合
-                return null;
-            }
-        } else if (element instanceof TestCase) {
-            TestCase tc = (TestCase) element;
-            if (!tc.isTested()) {
-                // 実行していない場合
-                return null;
-            } else if (tc.isSuccess()) {
-                // 成功
-                return Display.getDefault().getSystemColor(SWT.COLOR_GREEN);
-            } else {
-                // 失敗
-                return Display.getDefault().getSystemColor(SWT.COLOR_RED);
-            }
-        }
-        return null; // デフォルト（白など）
     }
 
     // ツールバーを作成
@@ -597,38 +372,5 @@ public class TestResultView extends ViewPart {
         System.out.println("Scan Project: " + projectName);
         TestScanner.scanProjectTestCase(projectName, m_projectManager);
     }
-    
-    private void openEditorAtLine(String fileName, int lineNumber) {
-        if (fileName == null || fileName.isEmpty()) return;
 
-        // UIスレッドで実行
-        Display.getDefault().asyncExec(() -> {
-            try {
-                IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
-                IWorkbenchPage page = window.getActivePage();
-
-                IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
-                IFile file = root.getFile(IPath.fromPortableString(fileName));
-                if (file.exists()) {
-                    // エディタを開く
-                    IEditorPart editor = IDE.openEditor(page, file, true);
-
-                    // 指定行へジャンプ (ITextEditorにキャスト)
-                    if (editor instanceof ITextEditor && lineNumber > 0) {
-                        ITextEditor textEditor = (ITextEditor) editor;
-                        IDocument document = textEditor.getDocumentProvider().getDocument(textEditor.getEditorInput());
-                        
-                        // 行番号からオフセット（文字数）に変換
-                        // documentの行は0始まりなので -1 する
-                        int offset = document.getLineInformation(lineNumber - 1).getOffset();
-                        
-                        // エディタ上で選択（ジャンプ）
-                        textEditor.selectAndReveal(offset, 0);
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
 }
