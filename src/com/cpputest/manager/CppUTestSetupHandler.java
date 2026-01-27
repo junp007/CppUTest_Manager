@@ -123,7 +123,8 @@ public class CppUTestSetupHandler {
             ITool libGenTool = null;
             for (ITool tool : toolChain.getTools()) {
                 // IDに "libgen" を含むツールを探す（RX/RL78/RH850等で共通のキーワード）
-                if (tool.getId().contains("libgen") || tool.getName().contains("Library Generator")) {
+                if ((tool.getId() != null && tool.getId().contains("libgen")) ||
+                        (tool.getName() != null && tool.getName().contains("Library Generator"))) {
                     libGenTool = tool;
                     break;
                 }
@@ -144,8 +145,8 @@ public class CppUTestSetupHandler {
         IOption[] options = tool.getOptions();
         for (IOption opt : options) {
             // オプションのIDまたは名前にキーワードが含まれているかチェック
-            if (opt.getId().toLowerCase().contains(keyword.toLowerCase()) || 
-                opt.getName().toLowerCase().contains(keyword.toLowerCase())) {
+            if ((opt.getId() != null && opt.getId().toLowerCase().contains(keyword.toLowerCase())) || 
+                (opt.getName() != null && opt.getName().toLowerCase().contains(keyword.toLowerCase()))) {
                 
                 if (opt.getValueType() == IOption.BOOLEAN) {
                     ManagedBuildManager.setOption(config, tool, opt, value);

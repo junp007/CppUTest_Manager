@@ -26,6 +26,7 @@ public class VirtualConsoleMirror {
                     // TextConsoleからDocumentを取得
                     IDocument doc = textConsole.getDocument();
                     
+                    // 二重にリスナーを登録しないように登録済みのリスナーがあれば登録解除する
                     if (m_currentListener != null) {
                         doc.removeDocumentListener(m_currentListener);
                     }

@@ -4,6 +4,7 @@ import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.Path;
 import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
@@ -246,7 +247,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
                 IWorkbenchPage page = window.getActivePage();
 
                 IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
-                IFile file = root.getFile(IPath.fromPortableString(fileName));
+                IFile file = root.getFile(Path.fromPortableString(fileName));
                 if (file.exists()) {
                     // エディタを開く
                     IEditorPart editor = IDE.openEditor(page, file, true);

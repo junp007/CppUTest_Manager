@@ -11,4 +11,4 @@ void CppUTestRun(void);
 }
 #endif
 
-#endif CPP_UTEST_RUN_H
+#endif // CPP_UTEST_RUN_H
