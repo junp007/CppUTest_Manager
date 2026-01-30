@@ -239,9 +239,8 @@ public class TestResultView extends ViewPart {
 
                 if (confirm) {
                     try {
-                        IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
                         // resourcesフォルダ内のファイルを全部対象プロジェクトにコピーする
-                        CppUTestSetupHandler.applyCppUTestSetting(project);
+                        CppUTestSetupHandler.applyCppUTestSetting(projectName);
                         // CppUtestRunファイルを生成
                         generateCppUTestRun(projectName);
                         MessageDialog.openInformation(getViewSite().getShell(), "Success", "CppUTest の初期設定が完了しました。");

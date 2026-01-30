@@ -3,12 +3,15 @@ package com.cpputest.manager;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.Path;
@@ -21,12 +24,20 @@ import org.eclipse.cdt.managedbuilder.core.*;
 
 public class CppUTestSetupHandler {
 
-    public static void applyCppUTestSetting(IProject project) throws Exception {
+    public static void applyCppUTestSetting(String projectName) throws Exception {
+        // プロジェクトを取得
+        IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
+        // CppUTestのソースをプロジェクト内にコピー
         copyCppUTestSources(project);
-        configureProjectSettings(project);
+        // コンパイラの設定を行う
+        configureCompilerSettings(project);
+        // リンカの設定を行う
+        configureLinkerSettings(project);
+        // Library Generatorの設定を行う
         configureLibraryGenerator(project);
     }
     
+    // CppUTestのソースをプロジェクト内にコピー
     private static void copyCppUTestSources(IProject project) throws Exception {
         // 1. プラグイン内のソース場所を特定
         Bundle bundle = FrameworkUtil.getBundle(CppUTestSetupHandler.class);
@@ -66,7 +77,8 @@ public class CppUTestSetupHandler {
         }
     }
     
-    private static void configureProjectSettings(IProject project) throws CoreException {
+    // コンパイラの設定を行う
+    private static void configureCompilerSettings(IProject project) throws CoreException {
         // プロジェクト記述の取得（書き換え用）
         ICProjectDescription desc = CoreModel.getDefault().getProjectDescription(project, true);
 
@@ -103,6 +115,124 @@ public class CppUTestSetupHandler {
         CoreModel.getDefault().setProjectDescription(project, desc);
     }
     
+    // リンカの設定を行う
+    private static void configureLinkerSettings(IProject project) {
+        IManagedBuildInfo buildInfo = ManagedBuildManager.getBuildInfo(project);
+        if (buildInfo == null || buildInfo.getManagedProject() == null) {
+            return;
+        }
+
+        ToolchainType toolchainType = getToolchainType(project);
+        
+        IConfiguration[] managedConfigs = buildInfo.getManagedProject().getConfigurations();
+        for (IConfiguration mConfig : managedConfigs) {
+            ITool linker = mConfig.calculateTargetTool();
+            if (linker == null) continue;
+
+            if (toolchainType == ToolchainType.GCC_ARM) {
+                // --- GCCの設定 (以前の実装) ---
+                applyGccLinkerFlags(mConfig, linker);
+            } else if (toolchainType == ToolchainType.LLVM_ARM) {
+                // --- LLVMの設定 (アーカイブファイルの操作) ---
+                applyLlvmArchiveSettings(mConfig, linker);
+            }
+        }
+        ManagedBuildManager.saveBuildInfo(project, true);
+    }
+    
+    private static void applyGccLinkerFlags(IConfiguration config, ITool linker) {
+        for (IOption option : linker.getOptions()) {
+            String optionId = option.getId();
+            if (optionId.contains("option.cpp.linker.other")) {
+                try {
+                    String currentFlags = option.getStringValue();
+                    String flagToAdd = "--specs=rdimon.specs";
+                    
+                    if (!currentFlags.contains(flagToAdd)) {
+                        String newFlags = currentFlags.isEmpty() ? flagToAdd : currentFlags + " " + flagToAdd;
+                        ManagedBuildManager.setOption(config, linker, option, newFlags);
+                    }
+                } catch (BuildException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    
+    private static void applyLlvmArchiveSettings(IConfiguration config, ITool linker) {
+        // LLVMのアーカイブファイル設定用オプションID (RA LLVM Toolchain)
+        // 一般的に "linker.cpp.option.archives" やそれに類するIDです
+        String[] archiveOptionIds = {"com.renesas.cdt.managedbuild.llvm.core.option.linker.archives.archiveLibraryFiles"};
+
+        for (String archiveOptionId : archiveOptionIds) {
+            IOption archiveOption = linker.getOptionBySuperClassId(archiveOptionId);
+            if (archiveOption != null) {
+                try {
+                    // 現在のリストを取得
+                    String[] currentArchives = archiveOption.getBasicStringListValue();
+                    List<String> archiveList = new ArrayList<>(Arrays.asList(currentArchives));
+    
+                    boolean changed = false;
+    
+                    // "crt0" を "crt0-semihost" に置き換え
+                    if (archiveList.contains("crt0")) {
+                        int index = archiveList.indexOf("crt0");
+                        archiveList.set(index, "crt0-semihost");
+                        changed = true;
+                    } else if (!archiveList.contains("crt0-semihost")) {
+                        archiveList.add(0, "crt0-semihost"); // 先頭付近が望ましい
+                        changed = true;
+                    }
+    
+                    // "semihost" を追加
+                    if (!archiveList.contains("semihost")) {
+                        archiveList.add("semihost");
+                        changed = true;
+                    }
+    
+                    // 変更があれば適用
+                    if (changed) {
+                        ManagedBuildManager.setOption(config, linker, archiveOption, archiveList.toArray(new String[0]));
+                    }
+                } catch (BuildException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        
+        // リンカーエラー回避フラグの追加 (-Wl,-z,norelro)
+        // LLVMの "Other linker flags" 用のID (通常は以下のようなIDです)
+        String flagOptionId = "com.renesas.cdt.managedbuild.llvm.core.option.linker.other.userDefinedOptions";
+        IOption flagOption = linker.getOptionBySuperClassId(flagOptionId);
+
+        if (flagOption != null) {
+            try {
+                String[] currentFlags = flagOption.getBasicStringListValue();
+
+                // 既に含まれているかチェック
+                String norelroFlag = "-Wl,-z,norelro";
+                boolean isExist = false;
+                for (String currentFlag : currentFlags) {
+                    if (currentFlag.equals(norelroFlag)) {
+                        isExist = true;
+                    }
+                }
+                if (!isExist) {
+                 // 4. 配列をリストに変換して追加
+                    List<String> newFlagList = new ArrayList<>(Arrays.asList(currentFlags));
+                    newFlagList.add(norelroFlag);
+                    
+                    // 5. リストを再び String[] に変換してセット
+                    String[] updatedFlags = newFlagList.toArray(new String[0]);
+                    ManagedBuildManager.setOption(config, linker, flagOption, updatedFlags);
+                }
+            } catch (BuildException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
     // 指定した名前の設定項目が無い場合だけ設定を追加する
     private static void AddSettingIfNotExist(List<ICLanguageSettingEntry> entries, ICLanguageSettingEntry newSetting) {
         boolean isMatch = entries.stream().anyMatch(e -> e.getName().equals(newSetting.getName()));
@@ -111,7 +241,7 @@ public class CppUTestSetupHandler {
         }
     }
     
-    // Library Generatorの設定を更新する
+    // Library Generatorの設定を行う
     public static void configureLibraryGenerator(IProject project) throws CoreException, BuildException {
         // 書き込み可能なプロジェクト記述を取得
         IManagedProject managedProj = ManagedBuildManager.getBuildInfo(project).getManagedProject();
@@ -153,5 +283,46 @@ public class CppUTestSetupHandler {
                 }
             }
         }
+    }
+
+    public enum ToolchainType {
+        GCC_ARM, LLVM_ARM, CC_RX, GCC_RX, UNKNOWN
+    }
+    public static ToolchainType getToolchainType(IProject project) {
+        // プロジェクトのビルド情報を取得
+        IManagedBuildInfo buildInfo = ManagedBuildManager.getBuildInfo(project);
+        if (buildInfo == null) return ToolchainType.UNKNOWN;
+
+        IManagedProject managedProject = buildInfo.getManagedProject();
+        if (managedProject == null) return ToolchainType.UNKNOWN;
+
+        // 現在アクティブな構成（Debug/Releaseなど）を取得
+        IConfiguration activeConfig = buildInfo.getDefaultConfiguration();
+        if (activeConfig == null) return ToolchainType.UNKNOWN;
+
+        // ツールチェーンを取得
+        IToolChain toolchain = activeConfig.getToolChain();
+        if (toolchain == null) return ToolchainType.UNKNOWN;
+
+        // ツールチェーンのIDを取得（これが最も確実な識別子です）
+        String toolchainId = toolchain.getId();
+        
+        // RAのツールチェーンIDには通常以下の文字列が含まれます
+        if (toolchainId.contains("llvm.arm")) {
+            return ToolchainType.LLVM_ARM;
+        } else if (toolchainId.contains("ccrx")) {
+            return ToolchainType.CC_RX;
+        } else if (toolchainId.contains("gcc.rx")) {
+            return ToolchainType.GCC_RX;
+        } else if (toolchainId.contains("gnuarm")) {
+            return ToolchainType.GCC_ARM;
+        }
+
+        // IDで判別できない場合は名前でチェック
+        String name = toolchain.getName().toLowerCase();
+        if (name.contains("llvm")) return ToolchainType.LLVM_ARM;
+        if (name.contains("gnu") || name.contains("gcc")) return ToolchainType.GCC_ARM;
+
+        return ToolchainType.UNKNOWN;
     }
 }
