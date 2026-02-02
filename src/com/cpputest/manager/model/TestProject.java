@@ -6,7 +6,7 @@ import java.util.List;
 
 public class TestProject implements Iterable<TestGroup> {
     // テストグループリスト
-    private List<TestGroup> m_testGroups = new ArrayList<>();
+    private List<TestGroup> m_testGroups = new ArrayList<TestGroup>();
 
     public TestProject() {
     }
@@ -33,19 +33,25 @@ public class TestProject implements Iterable<TestGroup> {
     }
     
     public void clearExistFlag() {
-        getTestGroups().forEach(tg -> {
+        for (TestGroup tg : getTestGroups()) {
             tg.setExist(false);
             tg.clearTestCaseExistFlag();
-        });
+        }
     }
     
     public void removeNonExistTest() {
         // 各グループの存在しないテストケースを削除
-        m_testGroups.forEach(tg -> {
+        for (TestGroup tg : getTestGroups()) {
             tg.removeNonExistTestCase();
-        });
+        }
         // 存在しないグループを削除
-        m_testGroups.removeIf(tg -> !tg.isExist());
+        java.util.Iterator<TestGroup> it = getTestGroups().iterator();
+        while (it.hasNext()) {
+            TestGroup tg = it.next();
+            if (!tg.isExist()) {
+                it.remove();
+            }
+        }
     }
     
     public boolean isEmpty() {
@@ -53,8 +59,8 @@ public class TestProject implements Iterable<TestGroup> {
     }
     
     public void clearTestedFlag() {
-        getTestGroups().forEach(tg -> {
+        for (TestGroup tg : getTestGroups()) {
             tg.clearTestedFlag();
-        });
+        }
     }
 }

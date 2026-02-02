@@ -3,12 +3,16 @@ package com.cpputest.manager;
 import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.console.ConsolePlugin;
+import org.eclipse.ui.console.IConsole;
+import org.eclipse.ui.console.IConsoleManager;
 import org.eclipse.ui.console.TextConsole;
 
 import com.cpputest.manager.view.TestResultView;
 
 import java.lang.reflect.Field;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.jface.text.DocumentEvent;
 import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.text.IDocumentListener;
@@ -18,40 +22,43 @@ public class VirtualConsoleMirror {
 
     private static IDocumentListener m_currentListener = null;
     public static void scanAndHook() {
-        Display.getDefault().asyncExec(() -> {
-            try {
-                TextConsole textConsole = getTextConsole();
+        Display.getDefault().asyncExec(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    TextConsole textConsole = getAppropriateConsole();
 
-                if (textConsole != null) {
-                    // TextConsoleからDocumentを取得
-                    IDocument doc = textConsole.getDocument();
-                    
-                    // 二重にリスナーを登録しないように登録済みのリスナーがあれば登録解除する
-                    if (m_currentListener != null) {
-                        doc.removeDocumentListener(m_currentListener);
-                    }
-                    m_currentListener = new IDocumentListener() {
-                        @Override
-                        public void documentAboutToBeChanged(DocumentEvent event) { }
-
-                        @Override
-                        public void documentChanged(DocumentEvent event) {
-                            // event.getText() で「新しく追加された文字列」だけが直接取れる！
-                            String newText = event.getText();
-                            if (newText != null && !newText.isEmpty()) {
-                                System.out.println("Captured from Document: " + newText);
-                                processText(newText);
-                            }
+                    if (textConsole != null) {
+                        // TextConsoleからDocumentを取得
+                        IDocument doc = textConsole.getDocument();
+                        
+                        // 二重にリスナーを登録しないように登録済みのリスナーがあれば登録解除する
+                        if (m_currentListener != null) {
+                            doc.removeDocumentListener(m_currentListener);
                         }
-                    };
-                    
-                    // 2. Documentにリスナーを貼る
-                    doc.addDocumentListener(m_currentListener);
-                    System.out.println("Successfully hooked DocumentListener to TextConsole");
-                }
+                        m_currentListener = new IDocumentListener() {
+                            @Override
+                            public void documentAboutToBeChanged(DocumentEvent event) { }
 
-            } catch (Exception e) {
-                e.printStackTrace();
+                            @Override
+                            public void documentChanged(DocumentEvent event) {
+                                // event.getText() で「新しく追加された文字列」だけが直接取れる！
+                                String newText = event.getText();
+                                if (newText != null && !newText.isEmpty()) {
+                                    System.out.println("Captured from Document: " + newText);
+                                    processText(newText);
+                                }
+                            }
+                        };
+                        
+                        // 2. Documentにリスナーを貼る
+                        doc.addDocumentListener(m_currentListener);
+                        System.out.println("Successfully hooked DocumentListener to TextConsole");
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
@@ -90,17 +97,32 @@ public class VirtualConsoleMirror {
             e.printStackTrace();
         }
     }
+    
+    private static TextConsole getAppropriateConsole() {
+        String productId = Platform.getProduct().getId();
+        
+        // CodeWarriorの場合: 通常 "com.freescale.core.ide.ide"
+        // e2studioの場合: 通常 "com.renesas.cdt.p2.product" など
+        if (productId.contains("freescale") || productId.contains("codewarrior")) {
+            return getCWTextConsole();
+        } else if (productId.contains("renesas")) {
+            return getE2StudioTextConsole();
+        }
+        
+        // どちらでもない場合は標準的な取得を試みる
+        return getE2StudioTextConsole(); 
+    }
 
     // RenesasのDebugConsoleからTextConsoleを取得する
-    private static TextConsole getTextConsole() {
+    private static TextConsole getE2StudioTextConsole() {
         try {
             IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
             
+            String consoleViewID = "com.renesas.cdt.debug.debugconsole.ui.views.DebugConsoleView";
             // 1. Viewを探す。なければ作成する
-            IViewPart consoleView = page.findView("com.renesas.cdt.debug.debugconsole.ui.views.DebugConsoleView");
+            IViewPart consoleView = page.findView(consoleViewID);
             if (consoleView == null) {
-                consoleView = page.showView("com.renesas.cdt.debug.debugconsole.ui.views.DebugConsoleView", 
-                                            null, IWorkbenchPage.VIEW_CREATE);
+                consoleView = page.showView(consoleViewID, null, IWorkbenchPage.VIEW_CREATE);
             }
     
             // consolePage フィールドを取得
@@ -117,6 +139,29 @@ public class VirtualConsoleMirror {
             e.printStackTrace();
             return null;
         }
+    }
+    
+    private static TextConsole getCWTextConsole() {
+        // 1. ConsoleManagerを取得
+        IConsoleManager manager = ConsolePlugin.getDefault().getConsoleManager();
+        IConsole[] consoles = manager.getConsoles();
+
+        // 2. 既存のコンソールから "CodeWarrior" という名前を含むものを探す
+        for (IConsole console : consoles) {
+            String name = console.getName();
+            if (console instanceof TextConsole && name.contains("CodeWarrior") && name.contains(".elf")) {
+                return (TextConsole) console;
+            }
+        }
+
+        // 3. 見つからない場合は、一番最初の TextConsole を返してみる
+        for (IConsole console : consoles) {
+            if (console instanceof TextConsole) {
+                return (TextConsole) console;
+            }
+        }
+
+        return null;
     }
     
     private static void processText(String text) {

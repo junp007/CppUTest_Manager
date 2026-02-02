@@ -66,11 +66,22 @@ public class CppUTestSetupHandler {
                 copyRecursive(file, newFolder);
             } else {
                 IFile newFile = dest.getFile(new Path(file.getName()));
-                try (FileInputStream is = new FileInputStream(file)) {
+                // try-with-resources を try-finally に書き換え
+                FileInputStream is = null;
+                try {
+                    is = new FileInputStream(file);
                     if (newFile.exists()) {
                         newFile.setContents(is, true, true, null);
                     } else {
                         newFile.create(is, true, null);
+                    }
+                } finally {
+                    if (is != null) {
+                        try {
+                            is.close();
+                        } catch (java.io.IOException e) {
+                            // クローズ失敗時
+                        }
                     }
                 }
             }
@@ -161,7 +172,6 @@ public class CppUTestSetupHandler {
     
     private static void applyLlvmArchiveSettings(IConfiguration config, ITool linker) {
         // LLVMのアーカイブファイル設定用オプションID (RA LLVM Toolchain)
-        // 一般的に "linker.cpp.option.archives" やそれに類するIDです
         String[] archiveOptionIds = {"com.renesas.cdt.managedbuild.llvm.core.option.linker.archives.archiveLibraryFiles"};
 
         for (String archiveOptionId : archiveOptionIds) {
@@ -170,7 +180,7 @@ public class CppUTestSetupHandler {
                 try {
                     // 現在のリストを取得
                     String[] currentArchives = archiveOption.getBasicStringListValue();
-                    List<String> archiveList = new ArrayList<>(Arrays.asList(currentArchives));
+                    List<String> archiveList = new ArrayList<String>(Arrays.asList(currentArchives));
     
                     boolean changed = false;
     
@@ -202,7 +212,7 @@ public class CppUTestSetupHandler {
 
         
         // リンカーエラー回避フラグの追加 (-Wl,-z,norelro)
-        // LLVMの "Other linker flags" 用のID (通常は以下のようなIDです)
+        // LLVMの "Other linker flags"
         String flagOptionId = "com.renesas.cdt.managedbuild.llvm.core.option.linker.other.userDefinedOptions";
         IOption flagOption = linker.getOptionBySuperClassId(flagOptionId);
 
@@ -220,7 +230,7 @@ public class CppUTestSetupHandler {
                 }
                 if (!isExist) {
                  // 4. 配列をリストに変換して追加
-                    List<String> newFlagList = new ArrayList<>(Arrays.asList(currentFlags));
+                    List<String> newFlagList = new ArrayList<String>(Arrays.asList(currentFlags));
                     newFlagList.add(norelroFlag);
                     
                     // 5. リストを再び String[] に変換してセット
@@ -235,7 +245,12 @@ public class CppUTestSetupHandler {
     
     // 指定した名前の設定項目が無い場合だけ設定を追加する
     private static void AddSettingIfNotExist(List<ICLanguageSettingEntry> entries, ICLanguageSettingEntry newSetting) {
-        boolean isMatch = entries.stream().anyMatch(e -> e.getName().equals(newSetting.getName()));
+        boolean isMatch = false;
+        for (ICLanguageSettingEntry entry : entries) {
+            if (entry.getName().equals(newSetting.getName())) {
+                isMatch = true;
+            }
+        }
         if (!isMatch) {
             entries.add(newSetting);
         }

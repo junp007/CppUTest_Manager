@@ -7,7 +7,7 @@ public class TestGroup implements ICheckable {
     // テストグループ名
     private String m_name;
     // テストケースリスト
-    private List<TestCase> m_cases = new ArrayList<>();
+    private List<TestCase> m_cases = new ArrayList<TestCase>();
     // 展開されているかどうか
     private boolean m_expand;
     private boolean m_exist;
@@ -33,17 +33,29 @@ public class TestGroup implements ICheckable {
     
     // グループ配下のテストケースすべてのチェック状態を設定する
     public void setChecked(boolean checked) {
-        m_cases.stream().forEach(tc -> tc.setChecked(checked));
+        for (TestCase tc : m_cases) {
+            tc.setChecked(checked);
+        }
     }
     
     public boolean isChecked() {
         // 1つでもチェックされていたらtrueを返す
-        return m_cases.stream().anyMatch(TestCase::isChecked);
+        for (TestCase tc : m_cases) {
+            if (tc.isChecked()) {
+                return true;
+            }
+        }
+        return false;
     }
     
     public enum CheckState {NonChecked, PartChecked, AllChecked};
     public TestGroup.CheckState getCheckState() {
-        long checkedCount = m_cases.stream().filter(tc -> tc.isChecked()).count();
+        long checkedCount = 0;
+        for (TestCase tc : m_cases) {
+            if (tc.isChecked()) {
+                checkedCount++;
+            }
+        }
 
         if (checkedCount == 0) {
             // すべて未選択
@@ -74,24 +86,36 @@ public class TestGroup implements ICheckable {
     }
 
     public void clearTestCaseExistFlag() {
-        m_cases.forEach(tc -> {
+        for (TestCase tc : getCases()) {
             tc.setExist(false);
-        });
+        }
     }
     
     public void removeNonExistTestCase() {
-        m_cases.removeIf(tc -> !tc.isExist());
+        java.util.Iterator<TestCase> it = getCases().iterator();
+        while (it.hasNext()) {
+            TestCase tc = it.next();
+            if (!tc.isExist()) {
+                it.remove();
+            }
+        }
     }
     
     public void clearTestedFlag() {
-        m_cases.forEach(tc -> {
+        for (TestCase tc : getCases()) {
             tc.setTested(false);
-        });
+        }
     }
     
     // グループ内のテストケースの成功数を取得
     public int getSuccessCount() {
-        return (int)getCases().stream().filter(tc -> tc.isSuccess() && tc.isTested()).count();
+        int successCount = 0;
+        for (TestCase tc : getCases()) {
+            if (tc.isSuccess() && tc.isTested()) {
+                successCount++;
+            }
+        }
+        return successCount;
     }
     
     // グループ内のテストケースの総数を取得

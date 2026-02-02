@@ -1,11 +1,11 @@
 package com.cpputest.manager;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.eclipse.cdt.managedbuilder.core.IConfiguration;
 import org.eclipse.cdt.managedbuilder.core.IManagedBuildInfo;
@@ -26,7 +26,7 @@ import com.cpputest.manager.model.TestProject;
 public class TestRunnerGenerator {
     public static void generateCppUTestRun(String projectName, Object[] checkedElements, TestProject testProject) {
         // 高速判定のために配列を Set に変換
-        Set<Object> checkedSet = new HashSet<>(Arrays.asList(checkedElements));
+        Set<Object> checkedSet = new HashSet<Object>(Arrays.asList(checkedElements));
         // プロジェクトを取得
         IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
 
@@ -58,8 +58,12 @@ public class TestRunnerGenerator {
 
             // 引数の生成処理
             for (TestGroup testGroup : testProject) {
-                List<TestCase> selectedCases = testGroup.getCases().stream()
-                        .filter(tc -> checkedSet.contains(tc)).collect(Collectors.toList());
+                List<TestCase> selectedCases = new ArrayList<TestCase>();
+                for (TestCase tc : testGroup.getCases()) {
+                    if (checkedSet.contains(tc)) {
+                        selectedCases.add(tc);
+                    }
+                }
                 if (selectedCases.isEmpty()) {
                     continue; // このグループにはない
                 }

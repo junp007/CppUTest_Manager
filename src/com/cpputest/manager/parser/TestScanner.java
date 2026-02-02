@@ -28,11 +28,11 @@ public class TestScanner {
     private static final Pattern TEST_PATTERN = 
         Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
 
-    public static void scanProjectTestCase(String projectName, TestProjectManager testProjectManager) {
+    public static void scanProjectTestCase(final String projectName, final TestProjectManager testProjectManager) {
      // Jobの作成
         Job job = new Job("Scanning CppUTest cases in " + projectName) {
             @Override
-            protected IStatus run(IProgressMonitor monitor) {
+            protected IStatus run(final IProgressMonitor monitor) {
                 IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
                 if (!project.exists() || !project.isOpen()) {
                     return Status.OK_STATUS;
@@ -80,22 +80,31 @@ public class TestScanner {
     }
 
     private static void parseFile(IFile file, TestProjectManager testProjectManager) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getContents()))) {
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(file.getContents()));
             String line;
-            // 行番号を数える変数(最初の行を1とする)
             int lineNum = 1;
             while ((line = reader.readLine()) != null) {
                 Matcher matcher = TEST_PATTERN.matcher(line);
                 while (matcher.find()) {
                     String group = matcher.group(1);
                     String name = matcher.group(2);
-                    // ビューに未完了状態で追加
                     testProjectManager.updateTestResult(group, name, false, false, file.getFullPath().toString(), lineNum);
                 }
                 ++lineNum;
             }
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            // reader を確実に閉じる
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (java.io.IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 }

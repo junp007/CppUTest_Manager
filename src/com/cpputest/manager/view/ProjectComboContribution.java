@@ -1,16 +1,18 @@
 package com.cpputest.manager.view;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jface.action.ControlContribution;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.ComboViewer;
+import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.LabelProvider;
+import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Combo;
@@ -50,11 +52,14 @@ public class ProjectComboContribution extends ControlContribution {
         refreshProjectList();
 
         // 選択変更時のイベント
-        m_projectCombo.addSelectionChangedListener(event -> {
-            String newProjectName = getSelectedProjectName();
-            // プロジェクトのテストケースをスキャンする
-            m_resultView.changeProject(m_lastProjectName, newProjectName);
-            m_lastProjectName = newProjectName;
+        m_projectCombo.addSelectionChangedListener(new ISelectionChangedListener() {
+            @Override
+            public void selectionChanged(SelectionChangedEvent event) {
+                String newProjectName = getSelectedProjectName();
+                // プロジェクトのテストケースをスキャンする
+                m_resultView.changeProject(m_lastProjectName, newProjectName);
+                m_lastProjectName = newProjectName;
+            }
         });
         
         m_lastProjectName = getSelectedProjectName();
@@ -93,9 +98,12 @@ public class ProjectComboContribution extends ControlContribution {
     public void refreshProjectList() {
         IProject[] projects = ResourcesPlugin.getWorkspace().getRoot().getProjects();
         // オープンされているプロジェクトのみに絞り込む
-        List<IProject> openProjects = Arrays.stream(projects)
-                .filter(IProject::isOpen)
-                .collect(Collectors.toList());
+        List<IProject> openProjects = new ArrayList<IProject>();
+        for (IProject project : projects) {
+            if (project.isOpen()) {
+                openProjects.add(project);
+            }
+        }
         
         boolean isFirst = (getInput() == null);
         int selectIndex = 0;

@@ -6,9 +6,11 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jface.text.IDocument;
+import org.eclipse.jface.viewers.CheckStateChangedEvent;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.DoubleClickEvent;
+import org.eclipse.jface.viewers.ICheckStateListener;
 import org.eclipse.jface.viewers.ICheckStateProvider;
 import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
@@ -16,6 +18,7 @@ import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.ITreeViewerListener;
 import org.eclipse.jface.viewers.TreeExpansionEvent;
 import org.eclipse.jface.viewers.TreeViewerColumn;
+import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.GC;
@@ -23,6 +26,8 @@ import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IWorkbenchPage;
@@ -118,16 +123,19 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         });
 
         // チェック状態が変更されたときに呼ばれる
-        this.addCheckStateListener(event -> {
-            Object element = event.getElement();
-            boolean checked = event.getChecked();
+        this.addCheckStateListener(new ICheckStateListener() {
+            @Override
+            public void checkStateChanged(CheckStateChangedEvent event) {
+                Object element = event.getElement();
+                boolean checked = event.getChecked();
 
-            if (element instanceof ICheckable) {
-                ((ICheckable)element).setChecked(checked);
+                if (element instanceof ICheckable) {
+                    ((ICheckable)element).setChecked(checked);
+                }
+                // チェック状態が変わったのでリフレッシュ
+                CheckboxTreeViewer treeViewer = (CheckboxTreeViewer)event.getSource();
+                treeViewer.refresh();
             }
-            // チェック状態が変わったのでリフレッシュ
-            CheckboxTreeViewer treeViewer = (CheckboxTreeViewer)event.getSource();
-            treeViewer.refresh();
         });
         
         this.addTreeListener(new ITreeViewerListener() {
@@ -152,35 +160,38 @@ public class TestTreeViewer extends CheckboxTreeViewer {
             }
         });
         
-        this.getTree().addListener(SWT.EraseItem, event -> {
-            boolean isSelected = (event.detail & (SWT.SELECTED | SWT.HOT)) != 0;
-            if (!isSelected) return; // 選択されていないなら何もしない
+        this.getTree().addListener(SWT.EraseItem, new Listener() {
+            @Override
+            public void handleEvent(Event event) {
+                boolean isSelected = (event.detail & (SWT.SELECTED | SWT.HOT)) != 0;
+                if (!isSelected) return; // 選択されていないなら何もしない
 
-            // 標準の選択色をキャンセル
-            event.detail &= ~SWT.SELECTED;
+                // 標準の選択色をキャンセル
+                event.detail &= ~SWT.SELECTED;
 
-            TreeItem item = (TreeItem) event.item;
-            Color itemBackground = item.getBackground(event.index);
-            GC gc = event.gc;
-            // 描画後に復元するために現在値を保存しておく
-            Color oldBackground = gc.getBackground();
-            int oldAlpha = gc.getAlpha();
-            // 背景描画
-            if (itemBackground != null) {
-                gc.setBackground(itemBackground);
-            } else {
-                gc.setBackground(((Control)event.widget).getBackground());
+                TreeItem item = (TreeItem) event.item;
+                Color itemBackground = item.getBackground(event.index);
+                GC gc = event.gc;
+                // 描画後に復元するために現在値を保存しておく
+                Color oldBackground = gc.getBackground();
+                int oldAlpha = gc.getAlpha();
+                // 背景描画
+                if (itemBackground != null) {
+                    gc.setBackground(itemBackground);
+                } else {
+                    gc.setBackground(((Control)event.widget).getBackground());
+                }
+                gc.fillRectangle(event.x, event.y, event.width, event.height);
+
+                // 選択状態を暗く表示するため、半透明の黒を描く
+                gc.setAlpha(SELECTION_ALPHA);
+                gc.setBackground(Display.getDefault().getSystemColor(SWT.COLOR_BLACK));
+                gc.fillRectangle(event.x, event.y, event.width, event.height);
+                
+                // 背景、不透明度の復元
+                gc.setBackground(oldBackground);
+                gc.setAlpha(oldAlpha);
             }
-            gc.fillRectangle(event.x, event.y, event.width, event.height);
-
-            // 選択状態を暗く表示するため、半透明の黒を描く
-            gc.setAlpha(SELECTION_ALPHA);
-            gc.setBackground(Display.getDefault().getSystemColor(SWT.COLOR_BLACK));
-            gc.fillRectangle(event.x, event.y, event.width, event.height);
-            
-            // 背景、不透明度の復元
-            gc.setBackground(oldBackground);
-            gc.setAlpha(oldAlpha);
         });
         
         this.addDoubleClickListener(new IDoubleClickListener() {
@@ -206,9 +217,20 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         if (element instanceof TestGroup) {
             TestGroup group = (TestGroup) element;
             // 1つでも失敗があるか
-            boolean anyFailure = group.getCases().stream().anyMatch(tc -> tc.isTested() && !tc.isSuccess());
-            // 全件成功しているか（実行済みかつ失敗なし）
-            long successCount = group.getCases().stream().filter(tc -> tc.isTested() && tc.isSuccess()).count();
+            boolean anyFailure = false;
+            // 成功件数
+            long successCount = 0;
+            
+            for (TestCase tc : group.getCases()) {
+                // 失敗してるのはテスト済みかつisSuccessがfalseで判定する
+                if (tc.isTested()) {
+                    if (tc.isSuccess()) {
+                        ++successCount;
+                    } else {
+                        anyFailure = true;
+                    }
+                }
+            }
             boolean allSuccess = (successCount == group.getCases().size() && successCount > 0);
 
             if (anyFailure) {
@@ -237,36 +259,39 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         return null; // デフォルト（白など）
     }
     
-    private void openEditorAtLine(String fileName, int lineNumber) {
+    private void openEditorAtLine(final String fileName, final int lineNumber) {
         if (fileName == null || fileName.isEmpty()) return;
 
         // UIスレッドで実行
-        Display.getDefault().asyncExec(() -> {
-            try {
-                IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
-                IWorkbenchPage page = window.getActivePage();
+        Display.getDefault().asyncExec(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+                    IWorkbenchPage page = window.getActivePage();
 
-                IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
-                IFile file = root.getFile(Path.fromPortableString(fileName));
-                if (file.exists()) {
-                    // エディタを開く
-                    IEditorPart editor = IDE.openEditor(page, file, true);
+                    IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
+                    IFile file = root.getFile(Path.fromPortableString(fileName));
+                    if (file.exists()) {
+                        // エディタを開く
+                        IEditorPart editor = IDE.openEditor(page, file, true);
 
-                    // 指定行へジャンプ (ITextEditorにキャスト)
-                    if (editor instanceof ITextEditor && lineNumber > 0) {
-                        ITextEditor textEditor = (ITextEditor) editor;
-                        IDocument document = textEditor.getDocumentProvider().getDocument(textEditor.getEditorInput());
-                        
-                        // 行番号からオフセット（文字数）に変換
-                        // documentの行は0始まりなので -1 する
-                        int offset = document.getLineInformation(lineNumber - 1).getOffset();
-                        
-                        // エディタ上で選択（ジャンプ）
-                        textEditor.selectAndReveal(offset, 0);
+                        // 指定行へジャンプ (ITextEditorにキャスト)
+                        if (editor instanceof ITextEditor && lineNumber > 0) {
+                            ITextEditor textEditor = (ITextEditor) editor;
+                            IDocument document = textEditor.getDocumentProvider().getDocument(textEditor.getEditorInput());
+                            
+                            // 行番号からオフセット（文字数）に変換
+                            // documentの行は0始まりなので -1 する
+                            int offset = document.getLineInformation(lineNumber - 1).getOffset();
+                            
+                            // エディタ上で選択（ジャンプ）
+                            textEditor.selectAndReveal(offset, 0);
+                        }
                     }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
         });
     }
@@ -298,5 +323,19 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         public boolean hasChildren(Object element) {
             return element instanceof TestGroup && !((TestGroup) element).getCases().isEmpty();
         }
+
+        @Override
+        public void dispose() {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void inputChanged(Viewer arg0, Object arg1, Object arg2) {
+            // TODO Auto-generated method stub
+            
+        }
+        
+        
     }
 }

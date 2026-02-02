@@ -15,7 +15,7 @@ public class TestProjectManager implements Iterable<TestGroup> {
     String m_currentDebuggingProjectName;
     
     // 通知先のリスト
-    private List<Runnable> m_listeners = new ArrayList<>();
+    private List<Runnable> m_listeners = new ArrayList<Runnable>();
 
     public TestProjectManager() {
     }
@@ -97,10 +97,13 @@ public class TestProjectManager implements Iterable<TestGroup> {
         }
         
         // 該当するグループを探す
-        TestGroup group = groups.stream()
-                    .filter(g -> g.getName().equals(groupName))
-                    .findFirst().orElse(null);
-
+        TestGroup group = null;
+        for (TestGroup g : groups) {
+            if (g.getName().equals(groupName)) {
+                group = g;
+                break; // 最初の一つが見つかったらループを抜ける (findFirst相当)
+            }
+        }
 
         if (group == null) {
             // グループが見つからない場合は新しいグループを作成
@@ -111,9 +114,13 @@ public class TestProjectManager implements Iterable<TestGroup> {
         group.setExist(true);
         
         // テストケースを探す
-        TestCase target = group.getCases().stream()
-                .filter(tc -> tc.getName().equals(testName))
-                .findFirst().orElse(null);
+        TestCase target = null;
+        for (TestCase tc : group.getCases()) {
+            if (tc.getName().equals(testName)) {
+                target = tc;
+                break; // 最初の一つが見つかったらループを抜ける (findFirst相当)
+            }
+        }
         
         if (target == null) {
             // テストケースが見つからない場合は新しいテストケースを作成

@@ -15,10 +15,12 @@ public class Activator extends AbstractUIPlugin implements IDebugEventSetListene
         super.start(context);
         
         DebugPlugin.getDefault().addDebugEventListener(this);
-        
         // UIが準備できてから実行
-        Display.getDefault().asyncExec(() -> {
-            VirtualConsoleMirror.scanAndHook();
+        Display.getDefault().asyncExec(new Runnable() {
+            @Override
+            public void run() {
+                VirtualConsoleMirror.scanAndHook();
+            }
         });
     }
 

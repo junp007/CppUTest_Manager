@@ -27,6 +27,7 @@ import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.ISelectionListener;
+import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.eclipse.ui.IFileEditorInput;
@@ -47,6 +48,7 @@ public class TestResultView extends ViewPart {
     private TestProjectManager m_projectManager = new TestProjectManager();
     private IActionBars m_toolbars;
     private Label m_projectLabel;
+    private org.eclipse.jface.action.Action m_scanProjectAction;
 
     private ISelectionListener selectionListener;
     private IDebugEventSetListener debugListener;
@@ -75,37 +77,46 @@ public class TestResultView extends ViewPart {
     
     private void settingProjectManagerListener() {
         // テストケースのデータ更新イベントハンドラ
-        m_projectManager.addChangeListener(() -> {
-            // UIスレッドで実行する必要がある
-            Display.getDefault().asyncExec(() -> {
-                if (!m_treeViewer.getControl().isDisposed()) {
-                    m_treeViewer.refresh();
-                    // モデルのフラグに基づいて展開状態を復元
-                    syncExpandState();
-                }
-            });
+        m_projectManager.addChangeListener(new Runnable() {
+            @Override
+            public void run() {
+                // UIスレッドで実行する必要がある
+                Display.getDefault().asyncExec(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!m_treeViewer.getControl().isDisposed()) {
+                            m_treeViewer.refresh();
+                            // モデルのフラグに基づいて展開状態を復元
+                            syncExpandState();
+                        }
+                    }
+                });
+            }
         });
     }
     
     private void settingSelectionListener() {
         // プロジェクトが変更されたときのリスナー
-        selectionListener = (part, selection) -> {
-            if (part == TestResultView.this) return;
-            
-            IProject project = extractProject(selection);
+        selectionListener = new ISelectionListener() {
+            @Override
+            public void selectionChanged(IWorkbenchPart part, ISelection selection) {
+                if (part == TestResultView.this) return;
+                
+                IProject project = extractProject(selection);
 
-            // 選択から取れず、かつアクティブなのがエディタの場合
-            if (project == null && part instanceof IEditorPart) {
-                IEditorInput input = ((IEditorPart)part).getEditorInput();
-                if (input instanceof IFileEditorInput) {
-                    project = ((IFileEditorInput) input).getFile().getProject();
+                // 選択から取れず、かつアクティブなのがエディタの場合
+                if (project == null && part instanceof IEditorPart) {
+                    IEditorInput input = ((IEditorPart)part).getEditorInput();
+                    if (input instanceof IFileEditorInput) {
+                        project = ((IFileEditorInput) input).getFile().getProject();
+                    }
                 }
-            }
-            
-            if (project != null && project.getName() != m_projectManager.getCurrentProjectName()) {
-                // 表示するプロジェクトを切り替えてリフレッシュ
-                System.out.println("Selected Project: " + project.getName());
-                updateProjectDisplay(project);
+                
+                if (project != null && project.getName() != m_projectManager.getCurrentProjectName()) {
+                    // 表示するプロジェクトを切り替えてリフレッシュ
+                    System.out.println("Selected Project: " + project.getName());
+                    updateProjectDisplay(project);
+                }
             }
         };
          // プロジェクトが変更されたときのリスナー登録
@@ -122,7 +133,7 @@ public class TestResultView extends ViewPart {
                         ILaunch launch = process.getLaunch();
                         
                         // プロジェクトを特定
-                        IProject project = getProjectFromLaunch(launch);
+                        final IProject project = getProjectFromLaunch(launch);
                         if (project == null) {
                             // 無ければ無視
                             continue;
@@ -131,8 +142,11 @@ public class TestResultView extends ViewPart {
                         m_projectManager.setCurrentDebuggingProjectName(project.getName());
                         if (project.getName() != m_projectManager.getCurrentProjectName()) {
                             // プロジェクト名が変わっていればUIスレッドに切り替えて表示を更新
-                            Display.getDefault().asyncExec(() -> {
-                                updateProjectDisplay(project);
+                            Display.getDefault().asyncExec(new Runnable() {
+                                @Override
+                                public void run() {
+                                    updateProjectDisplay(project);
+                                }
                             });
                         }
                     }
@@ -226,7 +240,7 @@ public class TestResultView extends ViewPart {
         };
 
         // CppUTest用の設定ボタンのアクション
-        org.eclipse.jface.action.Action setupAction = new org.eclipse.jface.action.Action("Setting") {
+        org.eclipse.jface.action.Action m_setupAction = new org.eclipse.jface.action.Action("Setting") {
             @Override
             public void run() {
                 String projectName = m_projectManager.getCurrentProjectName();
@@ -243,6 +257,7 @@ public class TestResultView extends ViewPart {
                         CppUTestSetupHandler.applyCppUTestSetting(projectName);
                         // CppUtestRunファイルを生成
                         generateCppUTestRun(projectName);
+                        m_scanProjectAction.run();
                         MessageDialog.openInformation(getViewSite().getShell(), "Success", "CppUTest の初期設定が完了しました。");
                     } catch (Exception e) {
                         MessageDialog.openError(getViewSite().getShell(), "Error", "CppUTest の初期設定に失敗しました: " + e.getMessage());
@@ -252,7 +267,7 @@ public class TestResultView extends ViewPart {
         };
         
         // プロジェクトのスキャンボタンのアクション
-        org.eclipse.jface.action.Action scanProjectAction = new org.eclipse.jface.action.Action("Scan") {
+        m_scanProjectAction = new org.eclipse.jface.action.Action("Scan") {
             @Override
             public void run() {
                 scanProjectTestCase(m_projectManager.getCurrentProjectName());
@@ -271,17 +286,17 @@ public class TestResultView extends ViewPart {
         // アイコンの設定
 //        setupAction.setImageDescriptor(org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().
 //                getImageDescriptor(org.eclipse.ui.ISharedImages.IMG_ETOOL_HOME_NAV));
-        scanProjectAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
+        m_scanProjectAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.jdt.ui", "icons/full/elcl16/refresh.png"));
-        setupAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
+        m_setupAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.ui", "icons/full/etool16/tricks.png"));
         generateAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.jdt.ui", "icons/full/eview16/source.png"));
         clearResultAllAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
                 "org.eclipse.ui", "icons/full/etool16/clear.png"));
           
-        scanProjectAction.setToolTipText("プロジェクトのスキャン");
-        setupAction.setToolTipText("CppUTest用の設定");
+        m_scanProjectAction.setToolTipText("プロジェクトのスキャン");
+        m_setupAction.setToolTipText("CppUTest用の設定");
         generateAction.setToolTipText("CppUTestRun.cppを生成");
         clearResultAllAction.setToolTipText("テスト結果をクリア");
         
@@ -312,11 +327,11 @@ public class TestResultView extends ViewPart {
             }
         });
         // CppUTestセットアップボタン
-        toolbarManager.add(setupAction);
+        toolbarManager.add(m_setupAction);
         // セパレーター（区切り線）
         toolbarManager.add(new Separator());
         // Scanボタン
-        toolbarManager.add(scanProjectAction);
+        toolbarManager.add(m_scanProjectAction);
         // Clearボタン
         toolbarManager.add(clearResultAllAction);
         // セパレーター（区切り線）
