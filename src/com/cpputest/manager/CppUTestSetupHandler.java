@@ -15,6 +15,7 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.Path;
+import org.eclipse.core.runtime.Platform;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.FrameworkUtil;
 
@@ -33,8 +34,8 @@ public class CppUTestSetupHandler {
         configureCompilerSettings(project);
         // リンカの設定を行う
         configureLinkerSettings(project);
-        // Library Generatorの設定を行う
-        configureLibraryGenerator(project);
+        // ライブラリの設定を行う
+        configureLibrarySettings(project);
     }
     
     // CppUTestのソースをプロジェクト内にコピー
@@ -256,8 +257,49 @@ public class CppUTestSetupHandler {
         }
     }
     
+    private static void configureLibrarySettings(IProject project) throws CoreException, BuildException {
+        if (getEnvironmentType() == EnvironmentType.CodeWarrior) {
+            configureCodeWarriorLibrarySettings(project);
+        } else {
+            configureE2StudioLibrarySettings(project);
+        }
+    }
+    
+    private static void configureCodeWarriorLibrarySettings(IProject project) {
+        // 1. プロジェクトのビルド情報を取得
+        IManagedBuildInfo buildInfo = ManagedBuildManager.getBuildInfo(project);
+        if (buildInfo == null) return;
+
+        IConfiguration[] configs = buildInfo.getManagedProject().getConfigurations();
+
+        // 探すべきIDの定義
+        final String OPTION_LIBRARIAN_ID = "org.eclipse.cdt.cross.arm.gnu.sourcery.windows.toolchain.sharedoption.librarian";
+        final String OPTION_MODEL_ID = "org.eclipse.cdt.cross.arm.gnu.sourcery.windows.toolchain.sharedoption.model";
+        final String VALUE_MODEL_HOSTED = "org.eclipse.cdt.cross.arm.gnu.sourcery.windows.toolchain.sharedoption.model.ewl_cpp_hosted";
+
+        for (IConfiguration config : configs) {
+            IToolChain toolChain = config.getToolChain();
+            if (toolChain == null) continue;
+
+            // ToolChain直下のオプションを探す
+            IOption libOption = toolChain.getOptionBySuperClassId(OPTION_LIBRARIAN_ID);
+            if (libOption != null) {
+                // "Enable automatic library configurations" を true に
+                ManagedBuildManager.setOption(config, toolChain, libOption, true);
+            }
+
+            IOption modelOption = toolChain.getOptionBySuperClassId(OPTION_MODEL_ID);
+            if (modelOption != null) {
+                // "Model" を "ewl_c++_hosted" に
+                ManagedBuildManager.setOption(config, toolChain, modelOption, VALUE_MODEL_HOSTED);
+            }
+        }
+        // 3. 変更を保存
+        ManagedBuildManager.saveBuildInfo(project, true);
+    }
+    
     // Library Generatorの設定を行う
-    public static void configureLibraryGenerator(IProject project) throws CoreException, BuildException {
+    private static void configureE2StudioLibrarySettings(IProject project) throws CoreException, BuildException {
         // 書き込み可能なプロジェクト記述を取得
         IManagedProject managedProj = ManagedBuildManager.getBuildInfo(project).getManagedProject();
         IConfiguration[] configs = managedProj.getConfigurations();
@@ -339,5 +381,22 @@ public class CppUTestSetupHandler {
         if (name.contains("gnu") || name.contains("gcc")) return ToolchainType.GCC_ARM;
 
         return ToolchainType.UNKNOWN;
+    }
+    
+    public enum EnvironmentType {
+        E2Studio, CodeWarrior
+    }
+    public static EnvironmentType getEnvironmentType() {
+        String productId = Platform.getProduct().getId();
+        
+        // CodeWarriorの場合: 通常 "com.freescale.core.ide.ide"
+        // e2studioの場合: 通常 "com.renesas.cdt.p2.product" など
+        if (productId.contains("freescale") || productId.contains("codewarrior")) {
+            return EnvironmentType.CodeWarrior;
+        } else if (productId.contains("renesas")) {
+            return EnvironmentType.E2Studio;
+        } else {
+            return EnvironmentType.E2Studio;
+        }
     }
 }

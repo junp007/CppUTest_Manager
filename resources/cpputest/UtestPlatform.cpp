@@ -234,6 +234,7 @@ int (*PlatformSpecificVSNprintf)(char *str, size_t size, const char* format, va_
 
 static PlatformSpecificFile PlatformSpecificFOpenImplementation(const char* filename, const char* flag)
 {
+/*
 #ifdef STDC_WANT_SECURE_LIB
   FILE* file;
    fopen_s(&file, filename, flag);
@@ -241,6 +242,8 @@ static PlatformSpecificFile PlatformSpecificFOpenImplementation(const char* file
 #else
    return fopen(filename, flag);
 #endif
+*/
+    return NULL;
 }
 
 static void PlatformSpecificFPutsImplementation(const char* str, PlatformSpecificFile file)

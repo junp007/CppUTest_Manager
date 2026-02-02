@@ -253,11 +253,13 @@ public class TestResultView extends ViewPart {
 
                 if (confirm) {
                     try {
-                        // resourcesフォルダ内のファイルを全部対象プロジェクトにコピーする
+                        // resourcesフォルダ内のファイルを全部対象プロジェクトにコピーしたりプロジェクトの設定を行ったりする
                         CppUTestSetupHandler.applyCppUTestSetting(projectName);
                         // CppUtestRunファイルを生成
                         generateCppUTestRun(projectName);
+                        // プロジェクトのスキャン
                         m_scanProjectAction.run();
+                        
                         MessageDialog.openInformation(getViewSite().getShell(), "Success", "CppUTest の初期設定が完了しました。");
                     } catch (Exception e) {
                         MessageDialog.openError(getViewSite().getShell(), "Error", "CppUTest の初期設定に失敗しました: " + e.getMessage());

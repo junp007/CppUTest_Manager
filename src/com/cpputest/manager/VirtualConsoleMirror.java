@@ -99,17 +99,16 @@ public class VirtualConsoleMirror {
     }
     
     private static TextConsole getAppropriateConsole() {
-        String productId = Platform.getProduct().getId();
-        
-        // CodeWarriorの場合: 通常 "com.freescale.core.ide.ide"
-        // e2studioの場合: 通常 "com.renesas.cdt.p2.product" など
-        if (productId.contains("freescale") || productId.contains("codewarrior")) {
+        CppUTestSetupHandler.EnvironmentType type = CppUTestSetupHandler.getEnvironmentType();
+
+        // CodeWarriorかe2studioかでConsole取得方法を変える
+        if (type == CppUTestSetupHandler.EnvironmentType.CodeWarrior) {
             return getCWTextConsole();
-        } else if (productId.contains("renesas")) {
+        } else if (type == CppUTestSetupHandler.EnvironmentType.E2Studio) {
             return getE2StudioTextConsole();
         }
         
-        // どちらでもない場合は標準的な取得を試みる
+        // どちらでもない場合はe2studioとする
         return getE2StudioTextConsole(); 
     }
 
