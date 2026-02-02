@@ -12,7 +12,6 @@ import com.cpputest.manager.view.TestResultView;
 
 import java.lang.reflect.Field;
 
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.jface.text.DocumentEvent;
 import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.text.IDocumentListener;
