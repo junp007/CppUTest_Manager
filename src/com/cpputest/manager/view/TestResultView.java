@@ -3,7 +3,9 @@ package com.cpputest.manager.view;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.core.runtime.Path;
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.IDebugEventSetListener;
@@ -16,6 +18,7 @@ import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.action.ControlContribution;
 import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -30,6 +33,8 @@ import org.eclipse.ui.ISelectionListener;
 import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.FrameworkUtil;
 import org.eclipse.ui.IFileEditorInput;
 
 import com.cpputest.manager.CppUTestSetupHandler;
@@ -285,17 +290,18 @@ public class TestResultView extends ViewPart {
             }
         };
         
+        Bundle bundle = FrameworkUtil.getBundle(this.getClass());
         // アイコンの設定
 //        setupAction.setImageDescriptor(org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().
 //                getImageDescriptor(org.eclipse.ui.ISharedImages.IMG_ETOOL_HOME_NAV));
-        m_scanProjectAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
-                "org.eclipse.jdt.ui", "icons/full/elcl16/refresh.png"));
-        m_setupAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
-                "org.eclipse.ui", "icons/full/etool16/tricks.png"));
-        generateAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
-                "org.eclipse.jdt.ui", "icons/full/eview16/source.png"));
-        clearResultAllAction.setImageDescriptor(AbstractUIPlugin.imageDescriptorFromPlugin(
-                "org.eclipse.ui", "icons/full/etool16/clear.png"));
+        m_scanProjectAction.setImageDescriptor(ImageDescriptor.createFromURL(
+                FileLocator.find(bundle, new Path("icons/refresh.png"), null)));
+        m_setupAction.setImageDescriptor(ImageDescriptor.createFromURL(
+                FileLocator.find(bundle, new Path("icons/tricks.png"), null)));
+        generateAction.setImageDescriptor(ImageDescriptor.createFromURL(
+                FileLocator.find(bundle, new Path("icons/source.png"), null)));
+        clearResultAllAction.setImageDescriptor(ImageDescriptor.createFromURL(
+                FileLocator.find(bundle, new Path("icons/clear.png"), null)));
           
         m_scanProjectAction.setToolTipText("プロジェクトのスキャン");
         m_setupAction.setToolTipText("CppUTest用の設定");
