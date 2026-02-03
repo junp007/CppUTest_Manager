@@ -20,11 +20,15 @@ import org.eclipse.swt.widgets.Display;
 public class VirtualConsoleMirror {
 
     private static IDocumentListener m_currentListener = null;
-    public static void scanAndHook() {
+    // 1行分のデータを保持しておくバッファ
+    private StringBuilder m_lineBuffer = new StringBuilder();
+    
+    public void scanAndHook() {
         Display.getDefault().asyncExec(new Runnable() {
             @Override
             public void run() {
                 try {
+                    m_lineBuffer.setLength(0);
                     TextConsole textConsole = getAppropriateConsole();
 
                     if (textConsole != null) {
@@ -147,7 +151,7 @@ public class VirtualConsoleMirror {
         // 2. 既存のコンソールから "CodeWarrior" という名前を含むものを探す
         for (IConsole console : consoles) {
             String name = console.getName();
-            if (console instanceof TextConsole && name.contains("CodeWarrior") && name.contains(".elf")) {
+            if (console instanceof TextConsole && name.contains("[CodeWarrior]")) {
                 return (TextConsole) console;
             }
         }
@@ -162,29 +166,49 @@ public class VirtualConsoleMirror {
         return null;
     }
     
-    private static void processText(String text) {
-        String[] lines = text.split("\\r?\\n");
+    private void processText(String text) {
+        if (text == null || text.isEmpty()) return;
 
-        for (String line : lines) {
-            // CppUTestの出力パターンの解析
-            // 例: "TEST(MyGroup, MyTest) - 5 ms"
-            if (line.contains("TEST(")) {
-                try {
-                    int start = line.indexOf("(") + 1;
-                    int end = line.indexOf(")");
-                    String content = line.substring(start, end);
-                    String[] parts = content.split(",");
-                    if (parts.length >= 2) {
-                        String group = parts[0].trim();
-                        String name = parts[1].trim();
+        // 受信した文字列をバッファに追加
+        m_lineBuffer.append(text);
 
-                        // 失敗(Failure)という文字が含まれていれば false、そうでなければ true
-                        boolean isSuccess = !line.contains("Failure");
-                        TestResultView.updateTestResult(group, name, isSuccess, true);
-                    }
-                } catch (Exception e) {
-                    // パース失敗時は何もしない
+        // バッファ内に改行が含まれているか確認
+        String currentBuffer = m_lineBuffer.toString();
+        
+        // 改行で分割（末尾に改行がない部分は、最後の要素になる）
+        // -1 を指定することで、最後が改行の場合は末尾が空文字になる
+        String[] parts = currentBuffer.split("\\r?\\n", -1);
+
+        // 最後の要素以外は「完成した行」として処理
+        for (int i = 0; i < parts.length - 1; i++) {
+            String completeLine = parts[i];
+            analyzeLine(completeLine);
+        }
+
+        // 最後の要素（まだ改行が来ていない未完成の文字列）をバッファに書き戻す
+        m_lineBuffer.setLength(0);
+        m_lineBuffer.append(parts[parts.length - 1]);
+    }
+
+    // 1行分の文字列を解析する
+    private void analyzeLine(String line) {
+        if (line.contains("TEST(")) {
+            try {
+                int start = line.indexOf("(") + 1;
+                int end = line.indexOf(")");
+                if (start <= 0 || end <= 0) return;
+
+                String content = line.substring(start, end);
+                String[] parts = content.split(",");
+                if (parts.length >= 2) {
+                    String group = parts[0].trim();
+                    String name = parts[1].trim();
+
+                    boolean isSuccess = !line.contains("Failure");
+                    TestResultView.updateTestResult(group, name, isSuccess, true);
                 }
+            } catch (Exception e) {
+                // パース失敗時はログを出力するなど
             }
         }
     }

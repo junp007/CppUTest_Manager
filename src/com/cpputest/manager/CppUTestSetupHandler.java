@@ -102,8 +102,10 @@ public class CppUTestSetupHandler {
 
             for (ICLanguageSetting lang : langSettings) {
                 String languageId = lang.getLanguageId();
+                String Id = lang.getId();
                 // CおよびC++のソースに対して適用
-                if (languageId != null && (languageId.contains("gcc") || languageId.contains("g++"))) {
+                if ((languageId != null && (languageId.contains("gcc") || languageId.contains("g++")) ||
+                        (Id != null && (Id.contains("armCpp"))))) {
                     // --- インクルードパスの追加 ---
                     List<ICLanguageSettingEntry> entries = lang.getSettingEntriesList(ICSettingEntry.INCLUDE_PATH);
                     // プロジェクト相対パスで "${ProjName}/src/cpputest/include" を追加
@@ -343,7 +345,7 @@ public class CppUTestSetupHandler {
     }
 
     public enum ToolchainType {
-        GCC_ARM, LLVM_ARM, CC_RX, GCC_RX, UNKNOWN
+        GCC_ARM, LLVM_ARM, CC_RX, GCC_RX, CW_GCC, CW_FreeScale, UNKNOWN
     }
     public static ToolchainType getToolchainType(IProject project) {
         // プロジェクトのビルド情報を取得
@@ -364,7 +366,7 @@ public class CppUTestSetupHandler {
         // ツールチェーンのIDを取得（これが最も確実な識別子です）
         String toolchainId = toolchain.getId();
         
-        // RAのツールチェーンIDには通常以下の文字列が含まれます
+        // ツールチェーンIDに含まれている文字列でどのツールチェーンかを分類
         if (toolchainId.contains("llvm.arm")) {
             return ToolchainType.LLVM_ARM;
         } else if (toolchainId.contains("ccrx")) {
@@ -373,6 +375,10 @@ public class CppUTestSetupHandler {
             return ToolchainType.GCC_RX;
         } else if (toolchainId.contains("gnuarm")) {
             return ToolchainType.GCC_ARM;
+        } else if (toolchainId.contains("cross.arm")) {
+            return ToolchainType.CW_GCC;
+        } else if (toolchainId.contains("freescale.arm")) {
+            return ToolchainType.CW_FreeScale;
         }
 
         // IDで判別できない場合は名前でチェック

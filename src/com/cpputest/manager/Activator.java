@@ -11,6 +11,7 @@ import org.osgi.framework.BundleContext;
 
 public class Activator extends AbstractUIPlugin implements IDebugEventSetListener {
 
+    private VirtualConsoleMirror m_console;
     public void start(BundleContext context) throws Exception {
         super.start(context);
         
@@ -19,7 +20,8 @@ public class Activator extends AbstractUIPlugin implements IDebugEventSetListene
         Display.getDefault().asyncExec(new Runnable() {
             @Override
             public void run() {
-                VirtualConsoleMirror.scanAndHook();
+                m_console = new VirtualConsoleMirror();
+                m_console.scanAndHook();
             }
         });
     }
@@ -29,7 +31,7 @@ public class Activator extends AbstractUIPlugin implements IDebugEventSetListene
         for (DebugEvent event : events) {
             // プロセスが作成（デバッグ開始）されたとき
             if (event.getKind() == DebugEvent.CREATE && event.getSource() instanceof IProcess) {
-                VirtualConsoleMirror.scanAndHook();
+                m_console.scanAndHook();
             }
         }
     }

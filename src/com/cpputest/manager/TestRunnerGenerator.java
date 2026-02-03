@@ -34,8 +34,7 @@ public class TestRunnerGenerator {
         CppUTestSetupHandler.EnvironmentType environment = CppUTestSetupHandler.getEnvironmentType();
         CppUTestSetupHandler.ToolchainType toolChain = CppUTestSetupHandler.getToolchainType(project);
         System.out.println("Environment: " + environment + ", ToolchainType: " + toolChain);
-        boolean appendInitialiseMonitorHandles = (environment == CppUTestSetupHandler.EnvironmentType.E2Studio) &&
-                (toolChain == CppUTestSetupHandler.ToolchainType.GCC_ARM);
+        boolean appendInitialiseMonitorHandles = (toolChain == CppUTestSetupHandler.ToolchainType.GCC_ARM);
         
         try {
             // src/cpputest_gen フォルダの取得と作成
