@@ -10,6 +10,7 @@ public class TestGroup implements ICheckable {
     private List<TestCase> m_cases = new ArrayList<TestCase>();
     // 展開されているかどうか
     private boolean m_expand;
+    // 存在確認フラグ(テストケーススキャン時にソース上に存在していないことを判断するために使う)
     private boolean m_exist;
     
     public TestGroup(String name) {
@@ -18,6 +19,7 @@ public class TestGroup implements ICheckable {
         m_exist = false;
     }
     
+    @Override
     public String getName() {
         return m_name;
     }
@@ -32,12 +34,14 @@ public class TestGroup implements ICheckable {
     }
     
     // グループ配下のテストケースすべてのチェック状態を設定する
+    @Override
     public void setChecked(boolean checked) {
         for (TestCase tc : m_cases) {
             tc.setChecked(checked);
         }
     }
     
+    @Override
     public boolean isChecked() {
         // 1つでもチェックされていたらtrueを返す
         for (TestCase tc : m_cases) {

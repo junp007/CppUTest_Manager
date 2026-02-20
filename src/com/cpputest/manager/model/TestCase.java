@@ -29,10 +29,12 @@ public class TestCase implements ICheckable {
       m_lineNumber = lineNumber;
     }
 
+    @Override
     public String getName() {
         return m_name;
     }
     
+    @Override
     public void setChecked(boolean isChecked) {
         m_checked = isChecked;
     }
@@ -53,6 +55,7 @@ public class TestCase implements ICheckable {
         m_tested = isTested;
     }
     
+    @Override
     public boolean isChecked() {
         return m_checked;
     }
