@@ -370,8 +370,10 @@ void (*PlatformSpecificAbort)(void) = abort;
 
 }
 
+#ifndef __CCRL__
 extern "C" int atexit(void (*func)(void))
 {
     // 実際には何も行わず、成功を返す
     return 0;
 }
+#endif
