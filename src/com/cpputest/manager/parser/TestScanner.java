@@ -24,10 +24,7 @@ import org.eclipse.core.runtime.Status;
 
 public class TestScanner {
 
-    // TEST(GroupName, TestName) にマッチする正規表現
-    private static final Pattern TEST_PATTERN = 
-        Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
-
+    // 指定したプロジェクト内のソースコードをスキャンしてテストケースを抽出する
     public static void scanProjectTestCase(final String projectName, final TestProjectManager testProjectManager) {
      // Jobの作成
         Job job = new Job("Scanning CppUTest cases in " + projectName) {
@@ -79,6 +76,9 @@ public class TestScanner {
         job.schedule(); // 実行キューに入れる
     }
 
+    // TEST(GroupName, TestName) にマッチする正規表現
+    private static final Pattern TEST_PATTERN =  Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
+    
     private static void parseFile(IFile file, TestProjectManager testProjectManager) {
         BufferedReader reader = null;
         try {

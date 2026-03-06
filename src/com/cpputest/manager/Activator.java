@@ -31,7 +31,13 @@ public class Activator extends AbstractUIPlugin implements IDebugEventSetListene
         for (DebugEvent event : events) {
             // プロセスが作成（デバッグ開始）されたとき
             if (event.getKind() == DebugEvent.CREATE && event.getSource() instanceof IProcess) {
-                m_console.scanAndHook();
+                // UIが準備できてから実行
+                Display.getDefault().asyncExec(new Runnable() {
+                    @Override
+                    public void run() {
+                        m_console.scanAndHook();
+                    }
+                });
             }
         }
     }

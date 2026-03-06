@@ -11,6 +11,8 @@ import org.eclipse.ui.console.TextConsole;
 import com.cpputest.manager.view.TestResultView;
 
 import java.lang.reflect.Field;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.jface.text.DocumentEvent;
 import org.eclipse.jface.text.IDocument;
@@ -23,49 +25,46 @@ public class VirtualConsoleMirror {
     // 1行分のデータを保持しておくバッファ
     private StringBuilder m_lineBuffer = new StringBuilder();
     
+    // コンソールを登録して監視を開始する
     public void scanAndHook() {
-        Display.getDefault().asyncExec(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    m_lineBuffer.setLength(0);
-                    TextConsole textConsole = getAppropriateConsole();
+        try {
+            m_lineBuffer.setLength(0);
+            TextConsole textConsole = getAppropriateConsole();
 
-                    if (textConsole != null) {
-                        // TextConsoleからDocumentを取得
-                        IDocument doc = textConsole.getDocument();
-                        
-                        // 二重にリスナーを登録しないように登録済みのリスナーがあれば登録解除する
-                        if (m_currentListener != null) {
-                            doc.removeDocumentListener(m_currentListener);
-                        }
-                        m_currentListener = new IDocumentListener() {
-                            @Override
-                            public void documentAboutToBeChanged(DocumentEvent event) { }
-
-                            @Override
-                            public void documentChanged(DocumentEvent event) {
-                                // event.getText() で「新しく追加された文字列」だけが直接取れる！
-                                String newText = event.getText();
-                                if (newText != null && !newText.isEmpty()) {
-                                    System.out.println("Captured from Document: " + newText);
-                                    processText(newText);
-                                }
-                            }
-                        };
-                        
-                        // 2. Documentにリスナーを貼る
-                        doc.addDocumentListener(m_currentListener);
-                        System.out.println("Successfully hooked DocumentListener to TextConsole");
-                    }
-
-                } catch (Exception e) {
-                    e.printStackTrace();
+            if (textConsole != null) {
+                // TextConsoleからDocumentを取得
+                IDocument doc = textConsole.getDocument();
+                
+                // 二重にリスナーを登録しないように登録済みのリスナーがあれば登録解除する
+                if (m_currentListener != null) {
+                    doc.removeDocumentListener(m_currentListener);
                 }
+                m_currentListener = new IDocumentListener() {
+                    @Override
+                    public void documentAboutToBeChanged(DocumentEvent event) { }
+
+                    @Override
+                    public void documentChanged(DocumentEvent event) {
+                        // event.getText() で「新しく追加された文字列」だけが直接取れる！
+                        String newText = event.getText();
+                        if (newText != null && !newText.isEmpty()) {
+                            System.out.println("Captured from Document: " + newText);
+                            processText(newText);
+                        }
+                    }
+                };
+                
+                // 2. Documentにリスナーを貼る
+                doc.addDocumentListener(m_currentListener);
+                System.out.println("Successfully hooked DocumentListener to TextConsole");
             }
-        });
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
     
+    // consoleViewを解析するためのデバッグ用関数
     private static void analyzeConsoleView(IViewPart consoleView) {
         Field[] fields = consoleView.getClass().getDeclaredFields();
         for (Field f : fields) {
@@ -169,7 +168,7 @@ public class VirtualConsoleMirror {
     private void processText(String text) {
         if (text == null || text.isEmpty()) return;
 
-        // 受信した文字列をバッファに追加
+        // 受信した文字列をバッファの後ろに追加
         m_lineBuffer.append(text);
 
         // バッファ内に改行が含まれているか確認
@@ -179,7 +178,7 @@ public class VirtualConsoleMirror {
         // -1 を指定することで、最後が改行の場合は末尾が空文字になる
         String[] parts = currentBuffer.split("\\r?\\n", -1);
 
-        // 最後の要素以外は「完成した行」として処理
+        // 行ごとに解析をする(最後の要素以外は「完成した行」として処理)
         for (int i = 0; i < parts.length - 1; i++) {
             String completeLine = parts[i];
             analyzeLine(completeLine);
@@ -190,26 +189,19 @@ public class VirtualConsoleMirror {
         m_lineBuffer.append(parts[parts.length - 1]);
     }
 
+    // TEST(GroupName, TestName) にマッチする正規表現
+    private static final Pattern TEST_PATTERN = Pattern.compile("TEST\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)");
+    
     // 1行分の文字列を解析する
     private void analyzeLine(String line) {
-        if (line.contains("TEST(")) {
-            try {
-                int start = line.indexOf("(") + 1;
-                int end = line.indexOf(")");
-                if (start <= 0 || end <= 0) return;
+        // 正規表現でマッチさせてgroup, nameを抜き出す
+        Matcher matcher = TEST_PATTERN.matcher(line);
+        if (matcher.find()) {
+            String group = matcher.group(1);
+            String name = matcher.group(2);
 
-                String content = line.substring(start, end);
-                String[] parts = content.split(",");
-                if (parts.length >= 2) {
-                    String group = parts[0].trim();
-                    String name = parts[1].trim();
-
-                    boolean isSuccess = !line.contains("Failure");
-                    TestResultView.updateTestResult(group, name, isSuccess, true);
-                }
-            } catch (Exception e) {
-                // パース失敗時はログを出力するなど
-            }
+            boolean isSuccess = !line.contains("Failure");
+            TestResultView.updateTestResult(group, name, isSuccess, true);
         }
     }
 

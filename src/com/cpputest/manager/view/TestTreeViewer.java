@@ -46,14 +46,16 @@ public class TestTreeViewer extends CheckboxTreeViewer {
     private static final int SELECTION_ALPHA = 40;
     
     public TestTreeViewer(Composite parent, TestProjectManager projectManger) {
-        super(parent, SWT.BORDER | SWT.MULTI | SWT.CHECK | SWT.FULL_SELECTION);
+        // 行全体を選択するためにSWT.FULL_SELECTIONを指定
+        super(parent, SWT.FULL_SELECTION);
         init(projectManger);
     }
 
     private void init(TestProjectManager projectManger) {
+        // ヘッダを表示
         this.getTree().setHeaderVisible(true);
+        // 枠線を表示
         this.getTree().setLinesVisible(true);
-        this.getControl().setLayoutData(new GridData(GridData.FILL_BOTH));
 
         // 列の設定（1列目：Name）
         TreeViewerColumn colName = new TreeViewerColumn(this, SWT.NONE);
@@ -62,8 +64,12 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         colName.setLabelProvider(new ColumnLabelProvider() {
             @Override
             public String getText(Object element) {
-                if (element instanceof ICheckable) return ((ICheckable) element).getName();
-                return "";
+                // getNameでグループもしくはテストケースの名前を取得して表示する
+                if (element instanceof ICheckable) {
+                    return ((ICheckable) element).getName();
+                } else {
+                    return "";
+                }
             }
             @Override
             public Color getBackground(Object element) {
@@ -211,9 +217,15 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         this.setInput(projectManger);
     }
     
-    // --- 背景色を決定する共通メソッド ---
+    // 要素の状態によって背景色を決定する
     private Color getStatusColor(Object element) {
+        // 成功時の色(緑)
+        final Color SUCCESS_COLOR = Display.getDefault().getSystemColor(SWT.COLOR_GREEN);
+        // 失敗時の色(赤)
+        final Color FAIL_COLOR = Display.getDefault().getSystemColor(SWT.COLOR_RED);
+        
         if (element instanceof TestGroup) {
+            // テストグループの場合
             TestGroup group = (TestGroup) element;
             // 1つでも失敗があるか
             boolean anyFailure = false;
@@ -234,30 +246,32 @@ public class TestTreeViewer extends CheckboxTreeViewer {
 
             if (anyFailure) {
                 // 実行済みかつ失敗あり
-                return Display.getDefault().getSystemColor(SWT.COLOR_RED);
+                return FAIL_COLOR;
             } else if (allSuccess) {
-                // 実行済みかつ全部成功
-                return Display.getDefault().getSystemColor(SWT.COLOR_GREEN);
+                // 実行済みかつ全部成功は緑
+                return SUCCESS_COLOR;
             } else {
-                // 実行していないものがある場合
+                // 実行していないものがある場合は色なし
                 return null;
             }
         } else if (element instanceof TestCase) {
+            // テストケースの場合
             TestCase tc = (TestCase) element;
             if (!tc.isTested()) {
                 // 実行していない場合
                 return null;
             } else if (tc.isSuccess()) {
-                // 成功
-                return Display.getDefault().getSystemColor(SWT.COLOR_GREEN);
+                // 成功の場合は緑
+                return SUCCESS_COLOR;
             } else {
-                // 失敗
-                return Display.getDefault().getSystemColor(SWT.COLOR_RED);
+                // 失敗の場合は赤
+                return FAIL_COLOR;
             }
         }
         return null; // デフォルト（白など）
     }
     
+    // 指定したファイルの指定した行をエディタで開く
     private void openEditorAtLine(final String fileName, final int lineNumber) {
         if (fileName == null || fileName.isEmpty()) return;
 
@@ -298,13 +312,17 @@ public class TestTreeViewer extends CheckboxTreeViewer {
     public class TestTreeContentProvider implements ITreeContentProvider {
         @Override
         public Object[] getElements(Object inputElement) {
-            // ルート要素としてグループの一覧を返す
-            return ((TestProjectManager)inputElement).getTestGroups().toArray();
+            if (inputElement instanceof TestProjectManager) {
+                // ルート要素としてグループの一覧を返す
+                return ((TestProjectManager)inputElement).getTestGroups().toArray();
+            }
+            return null;
         }
 
         @Override
         public Object[] getChildren(Object parentElement) {
             if (parentElement instanceof TestGroup) {
+                // 子要素としてテストケースを返す
                 return ((TestGroup) parentElement).getCases().toArray();
             }
             return null;
@@ -313,6 +331,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         @Override
         public Object getParent(Object element) {
             if (element instanceof TestCase) {
+                // テストケースが属するテストグループを返す
                 return ((TestCase) element).getGroup();
             }
             return null;
@@ -320,6 +339,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
 
         @Override
         public boolean hasChildren(Object element) {
+            // 子要素を持つのはテストグループのみで、テストケースが空じゃない場合
             return element instanceof TestGroup && !((TestGroup) element).getCases().isEmpty();
         }
 

@@ -48,21 +48,19 @@ import com.cpputest.manager.parser.TestScanner;
 import java.io.Console;
 
 public class TestResultView extends ViewPart {
-//    private ProjectComboContribution m_projComboContribution;
     private TestTreeViewer m_treeViewer;
     private TestProjectManager m_projectManager = new TestProjectManager();
     private IActionBars m_toolbars;
+    // 現在選択中のプロジェクト名を表示するラベル
     private Label m_projectLabel;
-    private org.eclipse.jface.action.Action m_scanProjectAction;
 
-    private ISelectionListener selectionListener;
-    private IDebugEventSetListener debugListener;
+    private ISelectionListener m_selectionListener;
 
     @Override
     public void createPartControl(Composite parent) {
-        // 1. UIの作成
+        // UIの作成
         m_treeViewer = new TestTreeViewer(parent, m_projectManager);
-        // 2. ツールバーの作成
+        // ツールバーの作成
         createToolbar();
         
         // プロジェクト変更時のリスナーの登録
@@ -74,8 +72,8 @@ public class TestResultView extends ViewPart {
     
     @Override
     public void dispose() {
-        if (selectionListener != null) {
-            getSite().getWorkbenchWindow().getSelectionService().removeSelectionListener(selectionListener);
+        if (m_selectionListener != null) {
+            getSite().getWorkbenchWindow().getSelectionService().removeSelectionListener(m_selectionListener);
         }
         super.dispose();
     }
@@ -102,11 +100,11 @@ public class TestResultView extends ViewPart {
     
     private void settingSelectionListener() {
         // プロジェクトが変更されたときのリスナー
-        selectionListener = new ISelectionListener() {
+        m_selectionListener = new ISelectionListener() {
             @Override
             public void selectionChanged(IWorkbenchPart part, ISelection selection) {
                 if (part == TestResultView.this) return;
-                
+
                 IProject project = extractProject(selection);
 
                 // 選択から取れず、かつアクティブなのがエディタの場合
@@ -125,10 +123,10 @@ public class TestResultView extends ViewPart {
             }
         };
          // プロジェクトが変更されたときのリスナー登録
-        getSite().getWorkbenchWindow().getSelectionService().addSelectionListener(selectionListener);
+        getSite().getWorkbenchWindow().getSelectionService().addSelectionListener(m_selectionListener);
         
         
-        debugListener = new IDebugEventSetListener() {
+        IDebugEventSetListener debugListener = new IDebugEventSetListener() {
             @Override
             public void handleDebugEvents(DebugEvent[] events) {
                 for (DebugEvent event : events) {
@@ -199,6 +197,7 @@ public class TestResultView extends ViewPart {
             m_projectLabel.setText("Project: " + newProjectName);
             // 文字列の長さに合わせてツールバーの幅を再計算させる
             m_projectLabel.getParent().layout(true);
+            // ツールバーの表示更新
             m_toolbars.updateActionBars();
         }
     }
@@ -262,8 +261,8 @@ public class TestResultView extends ViewPart {
                         CppUTestSetupHandler.applyCppUTestSetting(projectName);
                         // CppUtestRunファイルを生成
                         generateCppUTestRun(projectName);
-                        // プロジェクトのスキャン
-                        m_scanProjectAction.run();
+                        // プロジェクトのテストケースをスキャン
+                        scanProjectTestCase(projectName);
                         
                         MessageDialog.openInformation(getViewSite().getShell(), "Success", "CppUTest の初期設定が完了しました。");
                     } catch (Exception e) {
@@ -274,11 +273,10 @@ public class TestResultView extends ViewPart {
         };
         
         // プロジェクトのスキャンボタンのアクション
-        m_scanProjectAction = new org.eclipse.jface.action.Action("Scan") {
+        org.eclipse.jface.action.Action scanProjectAction = new org.eclipse.jface.action.Action("Scan") {
             @Override
             public void run() {
                 scanProjectTestCase(m_projectManager.getCurrentProjectName());
-                m_toolbars.updateActionBars();
             }
         };
         
@@ -294,7 +292,7 @@ public class TestResultView extends ViewPart {
         // アイコンの設定
 //        setupAction.setImageDescriptor(org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().
 //                getImageDescriptor(org.eclipse.ui.ISharedImages.IMG_ETOOL_HOME_NAV));
-        m_scanProjectAction.setImageDescriptor(ImageDescriptor.createFromURL(
+        scanProjectAction.setImageDescriptor(ImageDescriptor.createFromURL(
                 FileLocator.find(bundle, new Path("icons/refresh.png"), null)));
         m_setupAction.setImageDescriptor(ImageDescriptor.createFromURL(
                 FileLocator.find(bundle, new Path("icons/tricks.png"), null)));
@@ -303,7 +301,7 @@ public class TestResultView extends ViewPart {
         clearResultAllAction.setImageDescriptor(ImageDescriptor.createFromURL(
                 FileLocator.find(bundle, new Path("icons/clear.png"), null)));
           
-        m_scanProjectAction.setToolTipText("プロジェクトのスキャン");
+        scanProjectAction.setToolTipText("プロジェクトのスキャン");
         m_setupAction.setToolTipText("CppUTest用の設定");
         generateAction.setToolTipText("CppUTestRun.cppを生成");
         clearResultAllAction.setToolTipText("テスト結果をクリア");
@@ -339,14 +337,14 @@ public class TestResultView extends ViewPart {
         // セパレーター（区切り線）
         toolbarManager.add(new Separator());
         // Scanボタン
-        toolbarManager.add(m_scanProjectAction);
+        toolbarManager.add(scanProjectAction);
         // Clearボタン
         toolbarManager.add(clearResultAllAction);
         // セパレーター（区切り線）
         toolbarManager.add(new Separator());
         // Generateボタン
         toolbarManager.add(generateAction);
-        
+        // ツールバーの表示更新
         m_toolbars.updateActionBars();
     }
     
@@ -393,6 +391,9 @@ public class TestResultView extends ViewPart {
         
         System.out.println("Scan Project: " + projectName);
         TestScanner.scanProjectTestCase(projectName, m_projectManager);
+
+        // ツールバーの表示更新
+        m_toolbars.updateActionBars();
     }
 
 }

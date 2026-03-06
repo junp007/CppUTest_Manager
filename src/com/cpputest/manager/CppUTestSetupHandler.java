@@ -25,17 +25,25 @@ import org.eclipse.cdt.managedbuilder.core.*;
 
 public class CppUTestSetupHandler {
 
-    public static void applyCppUTestSetting(String projectName) throws Exception {
+    public static boolean applyCppUTestSetting(String projectName) throws Exception {
         // プロジェクトを取得
         IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(projectName);
         // CppUTestのソースをプロジェクト内にコピー
         copyCppUTestSources(project);
         // コンパイラの設定を行う
-        configureCompilerSettings(project);
+        if (!configureCompilerSettings(project)) {
+            throw new Exception("failed at compiler settings");
+        }
         // リンカの設定を行う
-        configureLinkerSettings(project);
+        if (!configureLinkerSettings(project)) {
+            throw new Exception("failed at linker settings");
+        }
         // ライブラリの設定を行う
-        configureLibrarySettings(project);
+        if (!configureLibrarySettings(project)) {
+            throw new Exception("failed at library settings");
+        }
+        
+        return true;
     }
     
     // CppUTestのソースをプロジェクト内にコピー
@@ -59,30 +67,31 @@ public class CppUTestSetupHandler {
         project.refreshLocal(IProject.DEPTH_INFINITE, null);
     }
 
-    private static void copyRecursive(File src, IContainer dest) throws Exception {
+    // srcのファイルをdestに再帰的にコピー
+    private static void copyRecursive(File src, IFolder dest) throws Exception {
         for (File file : src.listFiles()) {
             if (file.isDirectory()) {
+                // コピー元がディレクトリの場合はコピー先にディレクトリを作って、その中身も再帰的にコピー
                 IFolder newFolder = dest.getFolder(new Path(file.getName()));
-                if (!newFolder.exists()) newFolder.create(true, true, null);
+                if (!newFolder.exists()) {
+                    newFolder.create(true, true, null);
+                }
                 copyRecursive(file, newFolder);
             } else {
+                // コピー元がファイルの場合はファイルをコピー
                 IFile newFile = dest.getFile(new Path(file.getName()));
-                // try-with-resources を try-finally に書き換え
-                FileInputStream is = null;
+
+                FileInputStream input = null;
                 try {
-                    is = new FileInputStream(file);
+                    input = new FileInputStream(file);
                     if (newFile.exists()) {
-                        newFile.setContents(is, true, true, null);
+                        newFile.setContents(input, true, true, null);
                     } else {
-                        newFile.create(is, true, null);
+                        newFile.create(input, true, null);
                     }
                 } finally {
-                    if (is != null) {
-                        try {
-                            is.close();
-                        } catch (java.io.IOException e) {
-                            // クローズ失敗時
-                        }
+                    if (input != null) {
+                        input.close();
                     }
                 }
             }
@@ -90,9 +99,13 @@ public class CppUTestSetupHandler {
     }
     
     // コンパイラの設定を行う
-    private static void configureCompilerSettings(IProject project) throws CoreException {
+    private static boolean configureCompilerSettings(IProject project) throws CoreException {
         // プロジェクト記述の取得（書き換え用）
         ICProjectDescription desc = CoreModel.getDefault().getProjectDescription(project, true);
+        
+        if (desc == null) {
+            return false;
+        }
 
         // 全ての構成（Debug/Releaseなど）に対して設定を適用
         ICConfigurationDescription[] configs = desc.getConfigurations();
@@ -127,13 +140,15 @@ public class CppUTestSetupHandler {
         
         // 変更を保存
         CoreModel.getDefault().setProjectDescription(project, desc);
+        
+        return true;
     }
     
     // リンカの設定を行う
-    private static void configureLinkerSettings(IProject project) {
+    private static boolean configureLinkerSettings(IProject project) {
         IManagedBuildInfo buildInfo = ManagedBuildManager.getBuildInfo(project);
         if (buildInfo == null || buildInfo.getManagedProject() == null) {
-            return;
+            return false;
         }
 
         ToolchainType toolchainType = getToolchainType(project);
@@ -144,16 +159,19 @@ public class CppUTestSetupHandler {
             if (linker == null) continue;
 
             if (toolchainType == ToolchainType.GCC_ARM) {
-                // --- GCCの設定 (以前の実装) ---
+                // GCCの設定
                 applyGccLinkerFlags(mConfig, linker);
             } else if (toolchainType == ToolchainType.LLVM_ARM) {
-                // --- LLVMの設定 (アーカイブファイルの操作) ---
+                // LLVMの設定
                 applyLlvmArchiveSettings(mConfig, linker);
             }
         }
         ManagedBuildManager.saveBuildInfo(project, true);
+        
+        return true;
     }
     
+    // GCCの設定を行う
     private static void applyGccLinkerFlags(IConfiguration config, ITool linker) {
         for (IOption option : linker.getOptions()) {
             String optionId = option.getId();
@@ -173,6 +191,7 @@ public class CppUTestSetupHandler {
         }
     }
     
+    // LLVMの設定を行う
     private static void applyLlvmArchiveSettings(IConfiguration config, ITool linker) {
         // LLVMのアーカイブファイル設定用オプションID (RA LLVM Toolchain)
         String[] archiveOptionIds = {"com.renesas.cdt.managedbuild.llvm.core.option.linker.archives.archiveLibraryFiles"};
@@ -187,17 +206,19 @@ public class CppUTestSetupHandler {
     
                     boolean changed = false;
     
-                    // "crt0" を "crt0-semihost" に置き換え
+                    // "crt0-semihost"の追加
                     if (archiveList.contains("crt0")) {
+                        // "crt0"があるなら "crt0-semihost" に置き換え
                         int index = archiveList.indexOf("crt0");
                         archiveList.set(index, "crt0-semihost");
                         changed = true;
                     } else if (!archiveList.contains("crt0-semihost")) {
-                        archiveList.add(0, "crt0-semihost"); // 先頭付近が望ましい
+                        // "crt0"も"crt0-semihost"も無ければ追加
+                        archiveList.add(0, "crt0-semihost");
                         changed = true;
                     }
     
-                    // "semihost" を追加
+                    // "semihost" の追加
                     if (!archiveList.contains("semihost")) {
                         archiveList.add("semihost");
                         changed = true;
@@ -232,11 +253,11 @@ public class CppUTestSetupHandler {
                     }
                 }
                 if (!isExist) {
-                 // 4. 配列をリストに変換して追加
+                    //  配列をリストに変換して追加
                     List<String> newFlagList = new ArrayList<String>(Arrays.asList(currentFlags));
                     newFlagList.add(norelroFlag);
                     
-                    // 5. リストを再び String[] に変換してセット
+                    // リストを再び String[] に変換してセット
                     String[] updatedFlags = newFlagList.toArray(new String[0]);
                     ManagedBuildManager.setOption(config, linker, flagOption, updatedFlags);
                 }
@@ -259,18 +280,22 @@ public class CppUTestSetupHandler {
         }
     }
     
-    private static void configureLibrarySettings(IProject project) throws CoreException, BuildException {
+    private static boolean configureLibrarySettings(IProject project) throws CoreException, BuildException {
         if (getEnvironmentType() == EnvironmentType.CodeWarrior) {
-            configureCodeWarriorLibrarySettings(project);
+            return configureCodeWarriorLibrarySettings(project);
+        } else if (getEnvironmentType() == EnvironmentType.E2Studio) {
+            return configureE2StudioLibrarySettings(project);
         } else {
-            configureE2StudioLibrarySettings(project);
+            return false;
         }
     }
     
-    private static void configureCodeWarriorLibrarySettings(IProject project) {
+    private static boolean configureCodeWarriorLibrarySettings(IProject project) {
         // 1. プロジェクトのビルド情報を取得
         IManagedBuildInfo buildInfo = ManagedBuildManager.getBuildInfo(project);
-        if (buildInfo == null) return;
+        if (buildInfo == null) {
+            return false;
+        }
 
         IConfiguration[] configs = buildInfo.getManagedProject().getConfigurations();
 
@@ -296,14 +321,20 @@ public class CppUTestSetupHandler {
                 ManagedBuildManager.setOption(config, toolChain, modelOption, VALUE_MODEL_HOSTED);
             }
         }
-        // 3. 変更を保存
+        // 変更を保存
         ManagedBuildManager.saveBuildInfo(project, true);
+        
+        return true;
     }
     
     // Library Generatorの設定を行う
-    private static void configureE2StudioLibrarySettings(IProject project) throws CoreException, BuildException {
+    private static boolean configureE2StudioLibrarySettings(IProject project) throws CoreException, BuildException {
         // 書き込み可能なプロジェクト記述を取得
-        IManagedProject managedProj = ManagedBuildManager.getBuildInfo(project).getManagedProject();
+        IManagedBuildInfo buildInfo = ManagedBuildManager.getBuildInfo(project);
+        if (buildInfo == null) {
+            return false;
+        }
+        IManagedProject managedProj = buildInfo.getManagedProject();
         IConfiguration[] configs = managedProj.getConfigurations();
 
         for (IConfiguration config : configs) {
@@ -327,6 +358,8 @@ public class CppUTestSetupHandler {
         }
         // 変更を保存
         ManagedBuildManager.saveBuildInfo(project, true);
+        
+        return true;
     }
 
     // ツールオプションを名前(キーワード)で探して真偽値を設定するヘルパー
