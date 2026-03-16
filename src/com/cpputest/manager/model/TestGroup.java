@@ -126,4 +126,14 @@ public class TestGroup implements ICheckable {
     public int getTotalCount() {
         return getCases().size();
     }
+    
+    // グループ内のテストケースに1つでも失敗があるかどうか
+    public boolean hasFailure() {
+        for (TestCase tc : getCases()) {
+            if (!tc.isSuccess() && tc.isTested()) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

@@ -228,30 +228,20 @@ public class TestTreeViewer extends CheckboxTreeViewer {
             // テストグループの場合
             TestGroup group = (TestGroup) element;
             // 1つでも失敗があるか
-            boolean anyFailure = false;
+            boolean hasFailure = group.hasFailure();
             // 成功件数
-            long successCount = 0;
+            long successCount = group.getSuccessCount();
             
-            for (TestCase tc : group.getCases()) {
-                // 失敗してるのはテスト済みかつisSuccessがfalseで判定する
-                if (tc.isTested()) {
-                    if (tc.isSuccess()) {
-                        ++successCount;
-                    } else {
-                        anyFailure = true;
-                    }
-                }
-            }
             boolean allSuccess = (successCount == group.getCases().size() && successCount > 0);
 
-            if (anyFailure) {
+            if (hasFailure) {
                 // 実行済みかつ失敗あり
                 return FAIL_COLOR;
             } else if (allSuccess) {
                 // 実行済みかつ全部成功は緑
                 return SUCCESS_COLOR;
             } else {
-                // 実行していないものがある場合は色なし
+                // 一つも失敗は無く、全部成功ではない場合は色なし
                 return null;
             }
         } else if (element instanceof TestCase) {
