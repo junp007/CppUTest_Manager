@@ -10,7 +10,7 @@ public class TestProjectManager implements Iterable<TestGroup> {
     private Map<String, TestProject> m_testProjectMap = new HashMap<String, TestProject>();
     TestProject m_currentProject = new TestProject();
     // 表示中のプロジェクト名
-    String m_currentDidplayProjectName;
+    String m_currentDisplayProjectName;
     // デバッグ中のプロジェクト名
     String m_currentDebuggingProjectName;
     
@@ -25,11 +25,11 @@ public class TestProjectManager implements Iterable<TestGroup> {
     }
     
     public String getCurrentProjectName() {
-        return m_currentDidplayProjectName;
+        return m_currentDisplayProjectName;
     }
     
     public void setCurrentProjectName(String projectName) {
-        m_currentDidplayProjectName = projectName;
+        m_currentDisplayProjectName = projectName;
         m_testProjectMap.put(projectName, m_currentProject);
     }
     
@@ -73,7 +73,7 @@ public class TestProjectManager implements Iterable<TestGroup> {
     public void changeProject(String oldProjectName, String newProjectName) {
         // 現在のプロジェクトを保存する
         m_testProjectMap.put(oldProjectName, m_currentProject);
-        m_currentDidplayProjectName = newProjectName;
+        m_currentDisplayProjectName = newProjectName;
 
         if (m_testProjectMap.containsKey(newProjectName)) {
             // 保存済みのプロジェクトの場合はそのプロジェクトに切り替える
@@ -133,11 +133,31 @@ public class TestProjectManager implements Iterable<TestGroup> {
         if (isTested) {
             target.setSuccess(isSuccess);
             target.setTested(isTested);
+            // 成功した場合はエラーメッセージをクリアする
+            if (isSuccess) {
+                target.setErrorMessage("");
+            }
         }
         
         notifyChanged();
     }
     
+    // 失敗したテストケースにエラーメッセージを設定する
+    public void updateErrorMessage(String groupName, String testName, String errorMessage) {
+        List<TestGroup> groups = getDebuggingTestGroups();
+        for (TestGroup g : groups) {
+            if (g.getName().equals(groupName)) {
+                for (TestCase tc : g.getCases()) {
+                    if (tc.getName().equals(testName)) {
+                        tc.setErrorMessage(errorMessage);
+                        notifyChanged();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     // 現在のプロジェクトの存在フラグを全部falseにする
     public void clearCurrentProjectExistFlag() {
         m_currentProject.clearExistFlag();

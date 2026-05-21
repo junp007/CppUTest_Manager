@@ -25,46 +25,68 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TESTFILTER_H_
-#define TESTFILTER_H_
+#include "CppUTest/TestHarness.h"
+#include "CppUTestExt/MockSupport.h"
+#include "CppUTestExt/MockSupportPlugin.h"
 
-#include "SimpleString.h"
-
-class TestFilter
+class MockSupportPluginReporter : public MockFailureReporter
 {
+    UtestShell& test_;
+    TestResult& result_;
 public:
+    MockSupportPluginReporter(UtestShell& test, TestResult& result)
+        : test_(test), result_(result)
+    {
+    }
 
-    TestFilter();
-    TestFilter(const char* filter);
-    TestFilter(const SimpleString& filter);
+    virtual void failTest(const MockFailure& failure) CPPUTEST_OVERRIDE
+    {
+        result_.addFailure(failure);
+    }
 
-    TestFilter* add(TestFilter* filter);
-    TestFilter* getNext() const;
-
-    bool match(const SimpleString& name) const;
-
-    void strictMatching();
-    void invertMatching();
-    void setPairedFilter(TestFilter* filter);
-    TestFilter* getPairedFilter();
-    const TestFilter* getPairedFilter() const;
-    void invertPairedMatching();
-    bool isPairedInverted() const;
-
-    bool operator==(const TestFilter& filter) const;
-    bool operator!=(const TestFilter& filter) const;
-
-    SimpleString asString() const;
-private:
-    SimpleString filter_;
-    bool strictMatching_;
-    bool invertMatching_;
-    bool invertPairedMatching_;
-    TestFilter* next_;
-    TestFilter* pairedFilter_;
+    virtual UtestShell* getTestToFail() CPPUTEST_OVERRIDE
+    {
+        return &test_;
+    }
 };
 
-SimpleString StringFrom(const TestFilter& filter);
+MockSupportPlugin::MockSupportPlugin(const SimpleString& name)
+    : TestPlugin(name)
+{
+}
 
-#endif
+MockSupportPlugin::~MockSupportPlugin()
+{
+    clear();
+}
 
+void MockSupportPlugin::clear()
+{
+    repository_.clear();
+}
+
+void MockSupportPlugin::preTestAction(UtestShell&, TestResult&)
+{
+    mock().installComparatorsAndCopiers(repository_);
+}
+
+void MockSupportPlugin::postTestAction(UtestShell& test, TestResult& result)
+{
+    MockSupportPluginReporter reporter(test, result);
+    mock().setMockFailureStandardReporter(&reporter);
+    if (!test.hasFailed())
+        mock().checkExpectations();
+    mock().clear();
+    mock().setMockFailureStandardReporter(NULLPTR);
+    mock().removeAllComparatorsAndCopiers();
+}
+
+void MockSupportPlugin::installComparator(const SimpleString& name, MockNamedValueComparator& comparator)
+{
+    repository_.installComparator(name, comparator);
+}
+
+void MockSupportPlugin::installCopier(const SimpleString& name, MockNamedValueCopier& copier)
+{
+    repository_.installCopier(name, copier);
+}

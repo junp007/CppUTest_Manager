@@ -367,7 +367,32 @@ bool UtestShell::match(const char* target, const TestFilter* filters) const
 
 bool UtestShell::shouldRun(const TestFilter* groupFilters, const TestFilter* nameFilters) const
 {
-    return match(group_, groupFilters) && match(name_, nameFilters);
+    if (groupFilters == NULLPTR) return match(name_, nameFilters);
+
+    // First pass: exclude pairs take highest priority.
+    // A test is excluded when it matches ALL conditions of an exclude pair.
+    bool hasIncludeFilter = false;
+    for (const TestFilter* gf = groupFilters; gf != NULLPTR; gf = gf->getNext()) {
+        if (gf->getPairedFilter() != NULLPTR && gf->isPairedInverted()) {
+            if (gf->match(group_) && gf->getPairedFilter()->match(name_)) return false;
+        } else {
+            hasIncludeFilter = true;
+        }
+    }
+
+    // If there are only exclude pairs (no include conditions), run by default.
+    if (!hasIncludeFilter) return match(name_, nameFilters);
+
+    // Second pass: run if any include condition is satisfied.
+    for (const TestFilter* gf = groupFilters; gf != NULLPTR; gf = gf->getNext()) {
+        if (gf->getPairedFilter() != NULLPTR && !gf->isPairedInverted()) {
+            if (gf->match(group_) && gf->getPairedFilter()->match(name_)) return true;
+        } else if (gf->getPairedFilter() == NULLPTR) {
+            if (!gf->match(group_)) continue;
+            if (match(name_, nameFilters)) return true;
+        }
+    }
+    return false;
 }
 
 void UtestShell::failWith(const TestFailure& failure)

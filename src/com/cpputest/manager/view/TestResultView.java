@@ -13,19 +13,23 @@ import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.model.IProcess;
 import org.eclipse.jface.action.IToolBarManager;
-import org.eclipse.jface.viewers.ISelection;
-import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.action.ControlContribution;
+import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.viewers.ISelection;
+import org.eclipse.jface.viewers.ISelectionChangedListener;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
@@ -53,21 +57,55 @@ public class TestResultView extends ViewPart {
     private IActionBars m_toolbars;
     // 現在選択中のプロジェクト名を表示するラベル
     private Label m_projectLabel;
+    // エラーメッセージ表示エリア
+    private Text m_errorText;
 
     private ISelectionListener m_selectionListener;
 
     @Override
     public void createPartControl(Composite parent) {
+        // ツリーとエラーテキストエリアを縦に分割するSashForm
+        SashForm sashForm = new SashForm(parent, SWT.VERTICAL);
+
         // UIの作成
-        m_treeViewer = new TestTreeViewer(parent, m_projectManager);
+        m_treeViewer = new TestTreeViewer(sashForm, m_projectManager);
+
+        // エラーメッセージ表示エリア
+        m_errorText = new Text(sashForm, SWT.MULTI | SWT.READ_ONLY | SWT.WRAP | SWT.V_SCROLL | SWT.BORDER);
+        m_errorText.setBackground(Display.getDefault().getSystemColor(SWT.COLOR_WIDGET_BACKGROUND));
+
+        // 上部70%・下部30%の割合で分割
+        sashForm.setWeights(new int[]{70, 30});
+
+        // ツリーで選択が変わったときにエラーテキストを更新
+        m_treeViewer.addSelectionChangedListener(new ISelectionChangedListener() {
+            @Override
+            public void selectionChanged(SelectionChangedEvent event) {
+                updateErrorTextFromSelection();
+            }
+        });
+
         // ツールバーの作成
         createToolbar();
-        
+
         // プロジェクト変更時のリスナーの登録
         settingSelectionListener();
-        
+
         // projectManagerのリスナーの登録
         settingProjectManagerListener();
+    }
+
+    // 現在のツリー選択に応じてエラーテキストエリアを更新する
+    private void updateErrorTextFromSelection() {
+        if (m_errorText == null || m_errorText.isDisposed()) return;
+        IStructuredSelection selection = (IStructuredSelection) m_treeViewer.getSelection();
+        Object element = selection.getFirstElement();
+        if (element instanceof TestCase) {
+            String msg = ((TestCase) element).getErrorMessage();
+            m_errorText.setText(msg != null ? msg : "");
+        } else {
+            m_errorText.setText("");
+        }
     }
     
     @Override
@@ -87,15 +125,19 @@ public class TestResultView extends ViewPart {
                 Display.getDefault().asyncExec(new Runnable() {
                     @Override
                     public void run() {
-                        if (!m_treeViewer.getControl().isDisposed()) {
-                            m_treeViewer.refresh();
-                            // モデルのフラグに基づいて展開状態を復元
-                            syncExpandState();
-                        }
+                        onProjectManagerChanged();
                     }
                 });
             }
         });
+    }
+
+    private void onProjectManagerChanged() {
+        if (!m_treeViewer.getControl().isDisposed()) {
+            m_treeViewer.refresh();
+            syncExpandState();
+            updateErrorTextFromSelection();
+        }
     }
     
     private void settingSelectionListener() {
@@ -192,6 +234,11 @@ public class TestResultView extends ViewPart {
             scanProjectTestCase(newProjectName);
         }
         
+        // プロジェクト切り替えでエラーテキストをクリア
+        if (m_errorText != null && !m_errorText.isDisposed()) {
+            m_errorText.setText("");
+        }
+
         // プロジェクト名表示のラベルを更新
         if (m_projectLabel != null && !m_projectLabel.isDisposed()) {
             m_projectLabel.setText("Project: " + newProjectName);
@@ -369,6 +416,10 @@ public class TestResultView extends ViewPart {
 
     public static void updateTestResult(final String groupName, final String testName, final boolean isSuccess, final boolean isTested) {
         m_instance.m_projectManager.updateTestResult(groupName, testName, isSuccess, isTested, "", 0);
+    }
+
+    public static void updateErrorMessage(final String groupName, final String testName, final String errorMessage) {
+        m_instance.m_projectManager.updateErrorMessage(groupName, testName, errorMessage);
     }
     
     // プロジェクトを変更、及び再スキャンするときに呼ばれる

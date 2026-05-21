@@ -28,18 +28,43 @@
 #include "CppUTest/CppUTestConfig.h"
 #include "CppUTest/TestFilter.h"
 
-TestFilter::TestFilter() : strictMatching_(false), invertMatching_(false), next_(NULLPTR)
+TestFilter::TestFilter() : strictMatching_(false), invertMatching_(false), invertPairedMatching_(false), next_(NULLPTR), pairedFilter_(NULLPTR)
 {
 }
 
-TestFilter::TestFilter(const SimpleString& filter) : strictMatching_(false), invertMatching_(false), next_(NULLPTR)
+TestFilter::TestFilter(const SimpleString& filter) : strictMatching_(false), invertMatching_(false), invertPairedMatching_(false), next_(NULLPTR), pairedFilter_(NULLPTR)
 {
     filter_ = filter;
 }
 
-TestFilter::TestFilter(const char* filter) : strictMatching_(false), invertMatching_(false), next_(NULLPTR)
+TestFilter::TestFilter(const char* filter) : strictMatching_(false), invertMatching_(false), invertPairedMatching_(false), next_(NULLPTR), pairedFilter_(NULLPTR)
 {
     filter_ = filter;
+}
+
+void TestFilter::invertPairedMatching()
+{
+    invertPairedMatching_ = true;
+}
+
+bool TestFilter::isPairedInverted() const
+{
+    return invertPairedMatching_;
+}
+
+void TestFilter::setPairedFilter(TestFilter* filter)
+{
+    pairedFilter_ = filter;
+}
+
+TestFilter* TestFilter::getPairedFilter()
+{
+    return pairedFilter_;
+}
+
+const TestFilter* TestFilter::getPairedFilter() const
+{
+    return pairedFilter_;
 }
 
 TestFilter* TestFilter::add(TestFilter* filter)

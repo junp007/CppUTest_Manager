@@ -70,7 +70,13 @@ public class TestRunnerGenerator {
                     }
                 }
                 if (selectedCases.isEmpty()) {
-                    continue; // このグループにはない
+                    // グループ内で選択されているテストケースが無い場合はスキップ
+                    continue;
+                }
+                if (selectedCases.size() == testGroup.getCases().size()) {
+                    // グループ全体が選択されている場合はグループで指定する
+                    sb.append(("\n        , \"-sg\", \"") + testGroup.getName() + "\"");
+                    continue;
                 }
                 for (TestCase tc : selectedCases) {
                     sb.append(("\n        , \"-st\", \"") + testGroup.getName() + "." + tc.getName() + "\"");

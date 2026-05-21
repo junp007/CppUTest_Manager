@@ -18,6 +18,8 @@ public class TestCase implements ICheckable {
     private String m_fileName;
     // 行番号(エディタの仕様に合わせて最初の行を1とする)
     private int m_lineNumber;
+    // テスト失敗時のエラーメッセージ
+    private String m_errorMessage = "";
 
     public TestCase(String name, String fileName, int lineNumber) {
       m_name = name;
@@ -82,5 +84,13 @@ public class TestCase implements ICheckable {
     
     public int getLineNumber() {
         return m_lineNumber;
+    }
+
+    public String getErrorMessage() {
+        return m_errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        m_errorMessage = errorMessage != null ? errorMessage : "";
     }
 }

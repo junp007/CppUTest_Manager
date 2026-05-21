@@ -165,6 +165,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
             }
         });
         
+        // セルの背景描画時のクリアのイベントハンドラ
         this.getTree().addListener(SWT.EraseItem, new Listener() {
             @Override
             public void handleEvent(Event event) {

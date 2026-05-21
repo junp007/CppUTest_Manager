@@ -108,6 +108,7 @@ public class TestGroup implements ICheckable {
     public void clearTestedFlag() {
         for (TestCase tc : getCases()) {
             tc.setTested(false);
+            tc.setErrorMessage("");
         }
     }
     

@@ -24,11 +24,20 @@ public class VirtualConsoleMirror {
     private static IDocumentListener m_currentListener = null;
     // 1行分のデータを保持しておくバッファ
     private StringBuilder m_lineBuffer = new StringBuilder();
+    // エラーメッセージ収集中フラグ
+    private boolean m_collectingError = false;
+    // 収集中のエラーメッセージバッファ
+    private StringBuilder m_errorBuffer = new StringBuilder();
+    // エラーが発生したテストのグループ名とテスト名
+    private String m_failedGroup;
+    private String m_failedName;
     
     // コンソールを登録して監視を開始する
     public void scanAndHook() {
         try {
             m_lineBuffer.setLength(0);
+            m_collectingError = false;
+            m_errorBuffer.setLength(0);
             TextConsole textConsole = getAppropriateConsole();
 
             if (textConsole != null) {
@@ -197,12 +206,41 @@ public class VirtualConsoleMirror {
         // 正規表現でマッチさせてgroup, nameを抜き出す
         Matcher matcher = TEST_PATTERN.matcher(line);
         if (matcher.find()) {
+            // 直前のエラー収集があれば確定する
+            if (m_collectingError) {
+                finalizeError();
+            }
             String group = matcher.group(1);
             String name = matcher.group(2);
-
             boolean isSuccess = !line.contains("Failure");
             TestResultView.updateTestResult(group, name, isSuccess, true);
+            if (!isSuccess) {
+                // エラーメッセージの収集を開始
+                m_collectingError = true;
+                m_failedGroup = group;
+                m_failedName = name;
+                m_errorBuffer.setLength(0);
+            }
+        } else if (m_collectingError) {
+            if (line.trim().isEmpty()) {
+                // 空行でエラーメッセージ収集を終了
+                finalizeError();
+            } else {
+                if (m_errorBuffer.length() > 0) {
+                    m_errorBuffer.append("\n");
+                }
+                m_errorBuffer.append(line);
+            }
         }
+    }
+
+    private void finalizeError() {
+        String errorMsg = m_errorBuffer.toString().trim();
+        if (!errorMsg.isEmpty()) {
+            TestResultView.updateErrorMessage(m_failedGroup, m_failedName, errorMsg);
+        }
+        m_collectingError = false;
+        m_errorBuffer.setLength(0);
     }
 
 }

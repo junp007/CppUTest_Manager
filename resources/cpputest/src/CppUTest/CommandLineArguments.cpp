@@ -42,6 +42,7 @@ CommandLineArguments::~CommandLineArguments()
     while(groupFilters_) {
         TestFilter* current = groupFilters_;
         groupFilters_ = groupFilters_->getNext();
+        delete current->getPairedFilter();
         delete current;
     }
     while(nameFilters_) {
@@ -155,6 +156,7 @@ const char* CommandLineArguments::help() const
       "  -b                - run the tests backwards, reversing the normal way\n"
       "  -s [<seed>]       - shuffle tests randomly (randomization seed is optional, must be greater than 0)\n"
       "  -r[<#>]           - repeat the tests <#> times (or twice if <#> is not specified)\n"
+      "  -ri               - run ignored tests as if they are not ignored\n"
       "  -f                - Cause the tests to crash on failure (to allow the test to be debugged if necessary)\n"
       "  -e                - do not rethrow unexpected exceptions on failure\n"
       "  -ci               - continuous integration mode (equivalent to -e)\n";
@@ -316,11 +318,10 @@ bool CommandLineArguments::addGroupDotNameFilter(int ac, const char *const *av, 
     }
     if (exclude)
     {
-        groupFilter->invertMatching();
-        nameFilter->invertMatching();
+        groupFilter->invertPairedMatching();
     }
+    groupFilter->setPairedFilter(nameFilter);
     groupFilters_ = groupFilter->add(groupFilters_);
-    nameFilters_ = nameFilter->add(nameFilters_);
     return true;
 }
 
@@ -383,8 +384,8 @@ void CommandLineArguments::addTestToRunBasedOnVerboseOutput(int ac, const char *
     TestFilter* groupfilter = new TestFilter(wholename.subStringFromTill(wholename.at(0), ','));
     namefilter->strictMatching();
     groupfilter->strictMatching();
+    groupfilter->setPairedFilter(namefilter);
     groupFilters_ = groupfilter->add(groupFilters_);
-    nameFilters_ = namefilter->add(nameFilters_);
 }
 
 void CommandLineArguments::setPackageName(int ac, const char *const *av, int& i)
