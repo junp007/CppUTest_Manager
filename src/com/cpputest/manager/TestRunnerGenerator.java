@@ -61,25 +61,39 @@ public class TestRunnerGenerator {
             // CppUTestは "-st GroupName.TestName" で実行するテストを絞り込む
             sb.append("    const char* args[] = {\"test\", \"-v\"");
 
-            // 引数の生成処理
+            // 全グループ・全テストケースが選択されているか確認
+            boolean allSelected = true;
             for (TestGroup testGroup : testProject) {
-                List<TestCase> selectedCases = new ArrayList<TestCase>();
                 for (TestCase tc : testGroup.getCases()) {
-                    if (checkedSet.contains(tc)) {
-                        selectedCases.add(tc);
+                    if (!checkedSet.contains(tc)) {
+                        allSelected = false;
+                        break;
                     }
                 }
-                if (selectedCases.isEmpty()) {
-                    // グループ内で選択されているテストケースが無い場合はスキップ
-                    continue;
-                }
-                if (selectedCases.size() == testGroup.getCases().size()) {
-                    // グループ全体が選択されている場合はグループで指定する
-                    sb.append(("\n        , \"-sg\", \"") + testGroup.getName() + "\"");
-                    continue;
-                }
-                for (TestCase tc : selectedCases) {
-                    sb.append(("\n        , \"-st\", \"") + testGroup.getName() + "." + tc.getName() + "\"");
+                if (!allSelected) break;
+            }
+
+            // 引数の生成処理（全選択の場合は-sg/-stを付けない）
+            if (!allSelected) {
+                for (TestGroup testGroup : testProject) {
+                    List<TestCase> selectedCases = new ArrayList<TestCase>();
+                    for (TestCase tc : testGroup.getCases()) {
+                        if (checkedSet.contains(tc)) {
+                            selectedCases.add(tc);
+                        }
+                    }
+                    if (selectedCases.isEmpty()) {
+                        // グループ内で選択されているテストケースが無い場合はスキップ
+                        continue;
+                    }
+                    if (selectedCases.size() == testGroup.getCases().size()) {
+                        // グループ全体が選択されている場合はグループで指定する
+                        sb.append(("\n        , \"-sg\", \"") + testGroup.getName() + "\"");
+                        continue;
+                    }
+                    for (TestCase tc : selectedCases) {
+                        sb.append(("\n        , \"-st\", \"") + testGroup.getName() + "." + tc.getName() + "\"");
+                    }
                 }
             }
 
