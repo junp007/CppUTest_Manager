@@ -60,7 +60,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         // 列の設定（1列目：Name）
         TreeViewerColumn colName = new TreeViewerColumn(this, SWT.NONE);
         colName.getColumn().setWidth(200);
-        colName.getColumn().setText("Test Group / Name");
+        colName.getColumn().setText(Messages.column_test_group_name);
         colName.setLabelProvider(new ColumnLabelProvider() {
             @Override
             public String getText(Object element) {
@@ -80,7 +80,7 @@ public class TestTreeViewer extends CheckboxTreeViewer {
         // 列の設定（2列目：Status）
         TreeViewerColumn colStatus = new TreeViewerColumn(this, SWT.NONE);
         colStatus.getColumn().setWidth(100);
-        colStatus.getColumn().setText("Status");
+        colStatus.getColumn().setText(Messages.column_status);
         colStatus.setLabelProvider(new ColumnLabelProvider() {
             @Override
             public String getText(Object element) {
@@ -92,9 +92,9 @@ public class TestTreeViewer extends CheckboxTreeViewer {
                 if (element instanceof TestCase) {
                     TestCase tc = (TestCase)element;
                     if (tc.isTested()) {
-                        return tc.isSuccess() ? "Success" : "Failure";
+                        return tc.isSuccess() ? Messages.status_success : Messages.status_failure;
                     } else {
-                        return "Idle";
+                        return Messages.status_idle;
                     }
                 }
                 return "";

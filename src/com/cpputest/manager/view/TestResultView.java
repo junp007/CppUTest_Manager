@@ -41,6 +41,8 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.FrameworkUtil;
 import org.eclipse.ui.IFileEditorInput;
 
+import org.eclipse.osgi.util.NLS;
+
 import com.cpputest.manager.CppUTestSetupHandler;
 import com.cpputest.manager.TestRunnerGenerator;
 import com.cpputest.manager.model.TestCase;
@@ -241,7 +243,7 @@ public class TestResultView extends ViewPart {
 
         // プロジェクト名表示のラベルを更新
         if (m_projectLabel != null && !m_projectLabel.isDisposed()) {
-            m_projectLabel.setText("Project: " + newProjectName);
+            m_projectLabel.setText(NLS.bind(Messages.label_project_format, newProjectName));
             // 文字列の長さに合わせてツールバーの幅を再計算させる
             m_projectLabel.getParent().layout(true);
             // ツールバーの表示更新
@@ -273,7 +275,7 @@ public class TestResultView extends ViewPart {
     // ツールバーを作成
     private void createToolbar() {
         // CppUtestRun.cppを生成ボタンのアクション
-        org.eclipse.jface.action.Action generateAction = new org.eclipse.jface.action.Action("Generate") {
+        org.eclipse.jface.action.Action generateAction = new org.eclipse.jface.action.Action(Messages.action_generate) {
             @Override
             public void run() {
                 String projectName = m_projectManager.getCurrentProjectName();
@@ -281,8 +283,9 @@ public class TestResultView extends ViewPart {
                     return; // プロジェクト未選択なら何もしない
                 }
 
-                boolean confirm = MessageDialog.openQuestion(getViewSite().getShell(), "Generate",
-                        "プロジェクト '" + projectName + "' に CppUTest のmain関数ファイルの生成を行いますか？");
+                boolean confirm = MessageDialog.openQuestion(getViewSite().getShell(),
+                        Messages.dialog_generate_title,
+                        NLS.bind(Messages.dialog_generate_message, projectName));
 
                 if (confirm) {
                     generateCppUTestRun(projectName);
@@ -291,7 +294,7 @@ public class TestResultView extends ViewPart {
         };
 
         // CppUTest用の設定ボタンのアクション
-        org.eclipse.jface.action.Action m_setupAction = new org.eclipse.jface.action.Action("Setting") {
+        org.eclipse.jface.action.Action m_setupAction = new org.eclipse.jface.action.Action(Messages.action_setting) {
             @Override
             public void run() {
                 String projectName = m_projectManager.getCurrentProjectName();
@@ -299,8 +302,9 @@ public class TestResultView extends ViewPart {
                     return; // プロジェクト未選択なら何もしない
                 }
 
-                boolean confirm = MessageDialog.openQuestion(getViewSite().getShell(), 
-                    "Setting", "プロジェクト '" + projectName + "' に CppUTest の初期設定を行いますか？");
+                boolean confirm = MessageDialog.openQuestion(getViewSite().getShell(),
+                        Messages.dialog_setting_title,
+                        NLS.bind(Messages.dialog_setting_message, projectName));
 
                 if (confirm) {
                     try {
@@ -310,17 +314,17 @@ public class TestResultView extends ViewPart {
                         generateCppUTestRun(projectName);
                         // プロジェクトのテストケースをスキャン
                         scanProjectTestCase(projectName);
-                        
-                        MessageDialog.openInformation(getViewSite().getShell(), "Success", "CppUTest の初期設定が完了しました。");
+
+                        MessageDialog.openInformation(getViewSite().getShell(), Messages.dialog_success_title, Messages.dialog_success_message);
                     } catch (Exception e) {
-                        MessageDialog.openError(getViewSite().getShell(), "Error", "CppUTest の初期設定に失敗しました: " + e.getMessage());
+                        MessageDialog.openError(getViewSite().getShell(), Messages.dialog_error_title, NLS.bind(Messages.dialog_error_message, e.getMessage()));
                     }
                 }
             }
         };
-        
+
         // プロジェクトのスキャンボタンのアクション
-        org.eclipse.jface.action.Action scanProjectAction = new org.eclipse.jface.action.Action("Scan") {
+        org.eclipse.jface.action.Action scanProjectAction = new org.eclipse.jface.action.Action(Messages.action_scan) {
             @Override
             public void run() {
                 scanProjectTestCase(m_projectManager.getCurrentProjectName());
@@ -328,7 +332,7 @@ public class TestResultView extends ViewPart {
         };
         
         // テスト結果削除ボタンのアクション
-        org.eclipse.jface.action.Action clearResultAllAction = new org.eclipse.jface.action.Action("ClearAll") {
+        org.eclipse.jface.action.Action clearResultAllAction = new org.eclipse.jface.action.Action(Messages.action_clear_all) {
             @Override
             public void run() {
                 m_projectManager.clearCurrentProjectTestedFlag();
@@ -348,10 +352,10 @@ public class TestResultView extends ViewPart {
         clearResultAllAction.setImageDescriptor(ImageDescriptor.createFromURL(
                 FileLocator.find(bundle, new Path("icons/clear.png"), null)));
           
-        scanProjectAction.setToolTipText("プロジェクトのスキャン");
-        m_setupAction.setToolTipText("CppUTest用の設定");
-        generateAction.setToolTipText("CppUTestRun.cppを生成");
-        clearResultAllAction.setToolTipText("テスト結果をクリア");
+        scanProjectAction.setToolTipText(Messages.tooltip_scan);
+        m_setupAction.setToolTipText(Messages.tooltip_setting);
+        generateAction.setToolTipText(Messages.tooltip_generate);
+        clearResultAllAction.setToolTipText(Messages.tooltip_clear);
         
         // ビューのツールバーにボタンを追加
         m_toolbars = getViewSite().getActionBars();
@@ -371,7 +375,7 @@ public class TestResultView extends ViewPart {
                 
                 // ラベルを作成
                 m_projectLabel = new Label(container, SWT.NONE);
-                m_projectLabel.setText("Project: None");
+                m_projectLabel.setText(Messages.label_project_none);
                 
                 // ラベルをコンテナ内の垂直中央に配置する設定
                 m_projectLabel.setLayoutData(new GridData(SWT.BEGINNING, SWT.CENTER, false, true));
